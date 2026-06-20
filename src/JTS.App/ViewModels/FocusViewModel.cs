@@ -54,6 +54,9 @@ public sealed partial class FocusViewModel : ObservableObject
     [ObservableProperty] private string _summaryDateTitle = "Today summary";
     [ObservableProperty] private bool _isSummaryCalendarVisible;
     [ObservableProperty] private double _progressValue;
+    [ObservableProperty] private double _focusGoalHours = 8;
+    [ObservableProperty] private double _todayFocusProgress;
+    [ObservableProperty] private string _todayFocusGoalText = "0m / 8h";
     [ObservableProperty] private bool _hasActiveSession;
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private bool _canStopTracking;
@@ -131,6 +134,9 @@ public sealed partial class FocusViewModel : ObservableObject
             await RestorePomodoroStateAsync();
             _isRestored = true;
         }
+
+        var goalRaw = await _settings.GetFocusGoalHoursAsync();
+        FocusGoalHours = double.TryParse(goalRaw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var goal) && goal > 0 ? goal : 8;
 
         var snapshot = await _data.LoadTaskSnapshotAsync(forceSync);
         var today = DateTime.Today;
@@ -690,6 +696,11 @@ public sealed partial class FocusViewModel : ObservableObject
             .ToList();
         TodaySessionSummary = $"{daySessions.Count} entries · Work {FormatMinutes(daySessions.Sum(s => s.Session.ActualMinutes))}";
 
+        var todayMinutes = allTaskSessions
+            .Where(s => DisplayFormat.ToSpainTime(s.Session.StartedAt).Date == DateTime.Today)
+            .Sum(s => s.Session.ActualMinutes);
+        UpdateFocusGoal(todayMinutes);
+
         foreach (var item in daySessions
             .GroupBy(s => s.Task.Title)
             .Select(g => new FocusTaskSummaryView(g.Key, FormatMinutes(g.Sum(s => s.Session.ActualMinutes))))
@@ -717,6 +728,18 @@ public sealed partial class FocusViewModel : ObservableObject
         {
             TodayTimeSlices.Add(item);
         }
+    }
+
+    private int _todayFocusMinutes;
+
+    partial void OnFocusGoalHoursChanged(double value) => UpdateFocusGoal(_todayFocusMinutes);
+
+    private void UpdateFocusGoal(int todayMinutes)
+    {
+        _todayFocusMinutes = todayMinutes;
+        var goalMinutes = Math.Max(1, FocusGoalHours * 60);
+        TodayFocusProgress = Math.Clamp(todayMinutes / goalMinutes, 0, 1);
+        TodayFocusGoalText = $"{FormatMinutes(todayMinutes)} / {FocusGoalHours:0.#}h";
     }
 
     private IEnumerable<FocusTaskOption> AllVisibleTasks() =>

@@ -4,10 +4,10 @@
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>JTS_App</RootNamespace>
-    <Version>1.0.33</Version>
-    <AssemblyVersion>1.0.33.0</AssemblyVersion>
-    <FileVersion>1.0.33.0</FileVersion>
-    <InformationalVersion>1.0.33</InformationalVersion>
+    <Version>1.0.35</Version>
+    <AssemblyVersion>1.0.35.0</AssemblyVersion>
+    <FileVersion>1.0.35.0</FileVersion>
+    <InformationalVersion>1.0.35</InformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x86;x64;ARM64</Platforms>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
@@ -87,6 +87,8 @@
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
 </Project>
+
+
 
 
 

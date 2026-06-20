@@ -33,6 +33,9 @@ public sealed partial class FocusPage : Page, IRefreshablePage
         SummaryCalendar.UpdateLayout();
     }
 
+    private void ToggleFocusBar_Click(object sender, RoutedEventArgs e) =>
+        (Application.Current as App)?.ToggleFocusBar();
+
     private void SummaryCalendar_DayItemChanging(CalendarView sender, CalendarViewDayItemChangingEventArgs args)
     {
         if (args.Item is null) return;

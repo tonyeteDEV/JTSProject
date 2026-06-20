@@ -53,6 +53,7 @@ public partial class App : Application
             Log("Background features started");
             _ = Services.GetRequiredService<DataversePreloadService>().StartAsync();
             Log("Dataverse preload started");
+            _ = TryRestoreFocusBarAsync();
         }
         catch (Exception ex)
         {
@@ -82,6 +83,35 @@ public partial class App : Application
     {
         var quickCaptureWindow = new QuickCaptureWindow();
         quickCaptureWindow.Activate();
+    }
+
+    private FocusBarWindow? _focusBarWindow;
+
+    public void ToggleFocusBar()
+    {
+        if (_focusBarWindow is not null)
+        {
+            _focusBarWindow.Close();
+            return;
+        }
+
+        _focusBarWindow = new FocusBarWindow();
+        _focusBarWindow.Closed += (_, _) => _focusBarWindow = null;
+        _focusBarWindow.Activate();
+    }
+
+    private async Task TryRestoreFocusBarAsync()
+    {
+        try
+        {
+            var visible = await Services.GetRequiredService<AppSettingsService>().GetFocusBarVisibleAsync();
+            if (string.Equals(visible, "true", StringComparison.OrdinalIgnoreCase) && _focusBarWindow is null)
+                ToggleFocusBar();
+        }
+        catch (Exception ex)
+        {
+            Log("Focus bar restore failed: " + ex);
+        }
     }
 
     private async void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)

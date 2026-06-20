@@ -14,10 +14,22 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Spacing="4">
-            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Focus" />
-            <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Track time directly against today's, tomorrow's, and future tasks." />
-        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Focus" />
+                <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Track time directly against today's, tomorrow's, and future tasks." />
+            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Center" Click="ToggleFocusBar_Click">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon FontSize="14" Glyph="&#xE8A7;" />
+                    <TextBlock Text="Focus bar" />
+                </StackPanel>
+            </Button>
+        </Grid>
 
         <Grid Grid.Row="1" ColumnSpacing="18">
             <Grid.ColumnDefinitions>
@@ -127,6 +139,17 @@
                                         <TextBlock Text="Stop" />
                                     </StackPanel>
                                 </Button>
+                            </StackPanel>
+                            <StackPanel Spacing="4" Margin="0,8,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Daily focus goal" />
+                                    <TextBlock Grid.Column="1" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind ViewModel.TodayFocusGoalText, Mode=OneWay}" />
+                                </Grid>
+                                <ProgressBar Minimum="0" Maximum="1" Value="{x:Bind ViewModel.TodayFocusProgress, Mode=OneWay}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

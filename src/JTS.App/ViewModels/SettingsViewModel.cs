@@ -46,6 +46,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _allowNaturalLanguageAgentActions;
     [ObservableProperty] private bool _remindersEnabled = true;
     [ObservableProperty] private double _remindersLeadDays;
+    [ObservableProperty] private double _focusGoalHours = 8;
     [ObservableProperty] private bool _isTestingPomodoroBell;
     [ObservableProperty] private bool _isDownloadingWhisperModel;
     [ObservableProperty] private bool _isDownloadingVoskModel;
@@ -97,6 +98,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         AllowNaturalLanguageAgentActions = string.Equals(await _settings.GetAsync("AI.AllowNaturalLanguageAgentActions"), "true", StringComparison.OrdinalIgnoreCase);
         RemindersEnabled = !string.Equals(await _settings.GetRemindersEnabledAsync(), "false", StringComparison.OrdinalIgnoreCase);
         RemindersLeadDays = await GetDoubleSettingAsync("Reminders.LeadDays", 0);
+        FocusGoalHours = await GetDoubleSettingAsync("Focus.GoalHours", 8);
         var preloadColors = await _preload.GetConfiguredColorsAsync();
         PreloadLoadedColor = ParseColor(preloadColors.Loaded);
         PreloadLoadingColor = ParseColor(preloadColors.Loading);
@@ -125,6 +127,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         await _settings.SetAsync("AI.AllowNaturalLanguageAgentActions", AllowNaturalLanguageAgentActions ? "true" : "false");
         await _settings.SetRemindersEnabledAsync(RemindersEnabled);
         await _settings.SetRemindersLeadDaysAsync((int)Math.Clamp(Math.Round(RemindersLeadDays), 0, 30));
+        await _settings.SetFocusGoalHoursAsync(Math.Clamp(FocusGoalHours, 0.5, 24));
         await _preload.SaveColorsAsync(
             ToHex(PreloadLoadedColor),
             ToHex(PreloadLoadingColor),

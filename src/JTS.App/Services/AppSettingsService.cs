@@ -59,6 +59,14 @@ public sealed class AppSettingsService
     public Task<string?> GetReminderLastNotifiedAsync() => GetAsync("Reminders.LastNotified", encrypted: false);
     public Task SetReminderLastNotifiedAsync(string? value) => SetAsync("Reminders.LastNotified", value, encrypted: false);
 
+    public Task<string?> GetFocusGoalHoursAsync() => GetAsync("Focus.GoalHours", encrypted: false);
+    public Task SetFocusGoalHoursAsync(double value) =>
+        SetAsync("Focus.GoalHours", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
+    public Task<string?> GetFocusBarVisibleAsync() => GetAsync("Focus.BarVisible", encrypted: false);
+    public Task SetFocusBarVisibleAsync(bool value) => SetAsync("Focus.BarVisible", value ? "true" : "false", encrypted: false);
+    public Task<string?> GetFocusBarPositionAsync() => GetAsync("Focus.BarPosition", encrypted: false);
+    public Task SetFocusBarPositionAsync(string? value) => SetAsync("Focus.BarPosition", value, encrypted: false);
+
     public Task<string?> GetAsync(string key, bool encrypted = false)
     {
         return Task.FromResult<string?>(ReadCredential(key));

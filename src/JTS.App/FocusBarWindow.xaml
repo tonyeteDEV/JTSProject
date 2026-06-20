@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="JTS_App.FocusBarWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:JTS_App.ViewModels">
+
+    <Grid
+        x:Name="RootBar"
+        Background="#11151B"
+        BorderBrush="#3A414C"
+        BorderThickness="1"
+        CornerRadius="6"
+        ColumnSpacing="4"
+        Padding="6,3">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Drag handle -->
+        <Border
+            x:Name="DragGrip"
+            VerticalAlignment="Stretch"
+            Padding="3,0"
+            Background="Transparent"
+            PointerPressed="Drag_PointerPressed"
+            PointerMoved="Drag_PointerMoved"
+            PointerReleased="Drag_PointerReleased">
+            <FontIcon VerticalAlignment="Center" FontSize="12" Foreground="#8A94A3" Glyph="&#xE700;" />
+        </Border>
+
+        <ComboBox
+            x:Name="TaskCombo"
+            Grid.Column="1"
+            HorizontalAlignment="Stretch"
+            PlaceholderText="Pick a task"
+            DisplayMemberPath="DisplayName"
+            ItemsSource="{x:Bind ViewModel.TodayTasks, Mode=OneWay}"
+            SelectionChanged="TaskCombo_SelectionChanged" />
+
+        <TextBlock
+            Grid.Column="2"
+            VerticalAlignment="Center"
+            Margin="4,0"
+            FontFamily="Consolas"
+            Text="{x:Bind ViewModel.TimerText, Mode=OneWay}" />
+
+        <Button Grid.Column="3" Click="Start_Click" ToolTipService.ToolTip="Start tracking">
+            <FontIcon FontSize="13" Glyph="&#xE768;" />
+        </Button>
+        <Button Grid.Column="4" Click="Stop_Click" ToolTipService.ToolTip="Stop &amp; save">
+            <FontIcon FontSize="13" Glyph="&#xE777;" />
+        </Button>
+        <Button Grid.Column="5" ToolTipService.ToolTip="Add comment">
+            <FontIcon FontSize="13" Glyph="&#xE90A;" />
+            <Button.Flyout>
+                <Flyout
+                    x:Name="CommentFlyout"
+                    Placement="Top"
+                    ShouldConstrainToRootBounds="False">
+                    <StackPanel Width="380" Spacing="10">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Comment" />
+                        <TextBox
+                            x:Name="CommentBox"
+                            AcceptsReturn="True"
+                            Height="150"
+                            PlaceholderText="Saved to the active (or selected) task..."
+                            TextWrapping="Wrap"
+                            VerticalContentAlignment="Top"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                        <Button
+                            HorizontalAlignment="Stretch"
+                            Click="SaveComment_Click"
+                            Style="{StaticResource JtsAccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                <FontIcon FontSize="13" Glyph="&#xE74E;" />
+                                <TextBlock Text="Save comment" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Flyout>
+            </Button.Flyout>
+        </Button>
+        <Button Grid.Column="6" Click="Close_Click" ToolTipService.ToolTip="Close">
+            <FontIcon FontSize="12" Glyph="&#xE8BB;" />
+        </Button>
+    </Grid>
+</Window>

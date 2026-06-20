@@ -156,10 +156,11 @@
 
                 <Border Style="{StaticResource PanelBorderStyle}">
                     <StackPanel Spacing="12">
-                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Reminders" />
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Reminders &amp; focus goal" />
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <CheckBox
@@ -174,10 +175,18 @@
                                 SmallChange="1"
                                 SpinButtonPlacementMode="Inline"
                                 Value="{x:Bind ViewModel.RemindersLeadDays, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Column="2"
+                                Header="Daily focus goal (hours)"
+                                Minimum="0.5"
+                                Maximum="24"
+                                SmallChange="0.5"
+                                SpinButtonPlacementMode="Inline"
+                                Value="{x:Bind ViewModel.FocusGoalHours, Mode=TwoWay}" />
                         </Grid>
                         <TextBlock
                             Style="{StaticResource MutedTextBlockStyle}"
-                            Text="Shows a Windows notification for tasks due today or overdue (and up to N days ahead). Each task notifies at most once per day."
+                            Text="Shows a Windows notification for tasks due today or overdue (and up to N days ahead); each task notifies at most once per day. The focus goal drives the progress bar on the Focus page."
                             TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
