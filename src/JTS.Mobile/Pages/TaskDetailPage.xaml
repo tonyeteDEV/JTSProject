@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JTS.Mobile.Pages.TaskDetailPage"
+             BackgroundColor="#111418">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="0" Padding="16,14,16,24">
+
+            <!-- Priority + title -->
+            <Grid ColumnDefinitions="28,*" ColumnSpacing="8" Margin="0,0,0,4">
+                <Label x:Name="PriorityLabel" Grid.Column="0"
+                       FontSize="22" VerticalTextAlignment="Start"
+                       HorizontalTextAlignment="Center" Margin="0,2,0,0" />
+                <Label x:Name="TitleLabel" Grid.Column="1"
+                       TextColor="White" FontSize="20" FontAttributes="Bold"
+                       LineBreakMode="WordWrap" />
+            </Grid>
+
+            <!-- Project / Customer / Status chips row -->
+            <HorizontalStackLayout Spacing="8" Margin="0,0,0,14">
+                <Border x:Name="ProjectBadge" Padding="8,4" BackgroundColor="#1E293B" StrokeThickness="0">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                    <Label x:Name="ProjectLabel" TextColor="#93C5FD" FontSize="12" />
+                </Border>
+                <Border x:Name="StatusBadge" Padding="8,4" BackgroundColor="#1E293B" StrokeThickness="0">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                    <Label x:Name="StatusLabel" TextColor="#86EFAC" FontSize="12" />
+                </Border>
+                <Border x:Name="DueBadge" Padding="8,4" BackgroundColor="#1E293B" StrokeThickness="0" IsVisible="False">
+                    <Border.StrokeShape><RoundRectangle CornerRadius="12" /></Border.StrokeShape>
+                    <Label x:Name="DueLabel" TextColor="#FCA5A5" FontSize="12" />
+                </Border>
+            </HorizontalStackLayout>
+
+            <!-- Description -->
+            <Border x:Name="DescriptionBorder" Padding="14,12" BackgroundColor="#161C26"
+                    Stroke="#2A3240" StrokeThickness="1" Margin="0,0,0,16" IsVisible="False">
+                <Border.StrokeShape><RoundRectangle CornerRadius="10" /></Border.StrokeShape>
+                <Label x:Name="DescriptionLabel" TextColor="#D1D5DB" FontSize="14" LineBreakMode="WordWrap" />
+            </Border>
+
+            <!-- Action buttons -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,0,0,10">
+                <Button Text="Move to..." Clicked="OnMoveToColumn"
+                        BackgroundColor="#334155" TextColor="White" CornerRadius="10" HeightRequest="44" />
+                <Button Grid.Column="1" Text="+ Comment" Clicked="OnAddComment"
+                        BackgroundColor="#334155" TextColor="White" CornerRadius="10" HeightRequest="44" />
+            </Grid>
+            <Button Text="Start focus" Clicked="OnStartFocus"
+                    BackgroundColor="#2563EB" TextColor="White" CornerRadius="10"
+                    HeightRequest="44" Margin="0,0,0,20" />
+
+            <!-- Comments section -->
+            <Label Text="Comments" TextColor="#9CA3AF" FontSize="13" FontAttributes="Bold"
+                   Margin="0,0,0,8" />
+            <Label x:Name="CommentsEmptyLabel" Text="No comments." TextColor="#4B5563" FontSize="13"
+                   Margin="0,0,0,8" IsVisible="True" />
+            <CollectionView x:Name="CommentsList" HeightRequest="200" IsVisible="False">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Stroke="#1E293B" StrokeThickness="1" BackgroundColor="#141B26"
+                                Padding="12,10" Margin="0,0,0,6">
+                            <Border.StrokeShape><RoundRectangle CornerRadius="8" /></Border.StrokeShape>
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="{Binding CreatedAtText}" TextColor="#6B7280" FontSize="11" />
+                                <Label Text="{Binding Content}" TextColor="#E5E7EB" FontSize="13" LineBreakMode="WordWrap" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- Time entries section -->
+            <Label Text="Tracked time" TextColor="#9CA3AF" FontSize="13" FontAttributes="Bold"
+                   Margin="0,16,0,8" />
+            <Label x:Name="TimeEmptyLabel" Text="No tracked time." TextColor="#4B5563" FontSize="13"
+                   Margin="0,0,0,8" IsVisible="True" />
+            <CollectionView x:Name="TimeList" HeightRequest="160" IsVisible="False">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+                            <VerticalStackLayout Grid.Column="0" Spacing="2">
+                                <Label Text="{Binding DateText}" TextColor="#9CA3AF" FontSize="12" />
+                                <Label Text="{Binding TimeRangeText}" TextColor="#D1D5DB" FontSize="13" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1" Text="{Binding DurationText}"
+                                   TextColor="#34D399" FontSize="13" VerticalTextAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="JTS_App.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="SettingsRoot" Padding="28,22,28,28" RowSpacing="18" Background="#181B20" SizeChanged="SettingsRoot_SizeChanged">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Spacing="4">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Settings" />
+            <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="App preferences, AI keys, speech models, integrations, and data management." />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="SettingsContent" MaxWidth="1120" Spacing="14" HorizontalAlignment="Stretch">
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Workspace" />
+                        <Grid x:Name="WorkspaceGrid" ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button HorizontalAlignment="Stretch" Click="OpenCustomers_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE716;" />
+                                    <TextBlock Text="Customers" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" HorizontalAlignment="Stretch" Click="OpenProjects_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE8F1;" />
+                                    <TextBlock Text="Projects" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Appearance" />
+                        <Grid x:Name="AppearanceGrid" ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="FontBox" Header="Application font" HorizontalAlignment="Stretch" />
+                            <StackPanel Grid.Column="1" Spacing="4">
+                                <TextBlock Text="{x:Bind ViewModel.SelectedFontSizeLabel, Mode=OneWay}" />
+                                <Slider
+                                    Minimum="11"
+                                    Maximum="17"
+                                    StepFrequency="1"
+                                    Value="{x:Bind ViewModel.SelectedFontSize, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid x:Name="PreloadColorsGrid" ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Loaded color" />
+                                <Button x:Name="LoadedColorButton" HorizontalAlignment="Stretch" Click="PreloadColor_Click" Tag="Loaded">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="LoadedColorPreview" Height="28" CornerRadius="4" BorderBrush="#44515F" BorderThickness="1" />
+                                        <TextBlock x:Name="LoadedColorText" Grid.Column="1" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Text="Loading color" />
+                                <Button x:Name="LoadingColorButton" HorizontalAlignment="Stretch" Click="PreloadColor_Click" Tag="Loading">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="LoadingColorPreview" Height="28" CornerRadius="4" BorderBrush="#44515F" BorderThickness="1" />
+                                        <TextBlock x:Name="LoadingColorText" Grid.Column="1" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Spacing="6">
+                                <TextBlock Text="Pending color" />
+                                <Button x:Name="PendingColorButton" HorizontalAlignment="Stretch" Click="PreloadColor_Click" Tag="Pending">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="PendingColorPreview" Height="28" CornerRadius="4" BorderBrush="#44515F" BorderThickness="1" />
+                                        <TextBlock x:Name="PendingColorText" Grid.Column="1" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
+                                <TextBlock Text="Error color" />
+                                <Button x:Name="ErrorColorButton" HorizontalAlignment="Stretch" Click="PreloadColor_Click" Tag="Error">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border x:Name="ErrorColorPreview" Height="28" CornerRadius="4" BorderBrush="#44515F" BorderThickness="1" />
+                                        <TextBlock x:Name="ErrorColorText" Grid.Column="1" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Assistant and AI" />
+                        <TextBox
+                            Header="DeepSeek API key"
+                            PlaceholderText="sk-..."
+                            Text="{x:Bind ViewModel.DeepSeekApiKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid x:Name="AssistantOptionsGrid" ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox
+                                Content="Review task comments with AI before saving"
+                                IsChecked="{x:Bind ViewModel.ReviewTaskCommentsWithAi, Mode=TwoWay}" />
+                            <CheckBox
+                                Grid.Column="1"
+                                Content="Allow natural-language agent actions"
+                                IsChecked="{x:Bind ViewModel.AllowNaturalLanguageAgentActions, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock
+                            Style="{StaticResource MutedTextBlockStyle}"
+                            Text="Natural actions send your message plus a compact local project/task index to DeepSeek. The app still requires preview confirmation before writing changes."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Voice models" />
+                        <TextBox
+                            Header="Whisper model path"
+                            PlaceholderText="C:\Models\ggml-large-v3-turbo.bin"
+                            Text="{x:Bind ViewModel.WhisperModelPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox
+                            Header="Vosk Spanish model folder for local streaming voice"
+                            PlaceholderText="C:\Models\vosk-model-small-es-0.42"
+                            Text="{x:Bind ViewModel.VoskModelPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel x:Name="VoiceButtonsPanel" Orientation="Horizontal" Spacing="8">
+                            <Button Click="DownloadWhisper_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE896;" />
+                                    <TextBlock Text="Download Whisper large-v3-turbo" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="DownloadVosk_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE896;" />
+                                    <TextBlock Text="Download Vosk small ES" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="DownloadVoskAccurate_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE896;" />
+                                    <TextBlock Text="Download Vosk accurate ES" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="D365CE connection" />
+                        <Grid x:Name="D365Grid" ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBox
+                                Header="Tenant ID"
+                                PlaceholderText="00000000-0000-0000-0000-000000000000"
+                                Text="{x:Bind ViewModel.D365TenantId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox
+                                Grid.Column="1"
+                                Header="Client ID"
+                                PlaceholderText="00000000-0000-0000-0000-000000000000"
+                                Text="{x:Bind ViewModel.D365ClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <PasswordBox
+                                Grid.Row="1"
+                                Header="Client secret"
+                                Password="{x:Bind ViewModel.D365ClientSecret, Mode=TwoWay}" />
+                            <TextBox
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Header="Environment URL"
+                                PlaceholderText="https://org.crm4.dynamics.com"
+                                Text="{x:Bind ViewModel.D365EnvironmentUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Data and save" />
+                        <StackPanel x:Name="DataButtonsPanel" Orientation="Horizontal" Spacing="8">
+                            <Button Click="Save_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon FontSize="14" Glyph="&#xE74E;" />
+                                    <TextBlock Text="Save settings" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind ViewModel.Status, Mode=OneWay}" />
+                        <TextBlock
+                            Style="{StaticResource MutedTextBlockStyle}"
+                            Text="Secrets are encrypted for the current Windows user. D365CE sync reads jts_cliente and jts_proyecto."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

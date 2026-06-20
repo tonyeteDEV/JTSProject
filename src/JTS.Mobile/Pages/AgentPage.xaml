@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JTS.Mobile.Pages.AgentPage"
+             Title="Agent"
+             BackgroundColor="#111418">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto" Padding="16,12" RowSpacing="10">
+
+        <Label Grid.Row="0" x:Name="StatusLabel" Text="Agent ready."
+               FontSize="13" TextColor="#AEB6C2" />
+
+        <!-- Chat messages -->
+        <CollectionView Grid.Row="1" x:Name="AgentMessageList">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Stroke="#354052" StrokeThickness="1"
+                            BackgroundColor="{Binding BubbleColor}"
+                            Padding="12" Margin="0,0,0,8">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="8" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="{Binding Author}" TextColor="#AEB6C2"
+                                   FontSize="12" FontAttributes="Bold" />
+                            <Label Text="{Binding Content}" TextColor="White"
+                                   FontSize="14" LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Preview panel -->
+        <Border Grid.Row="2" x:Name="AgentPreviewPanel" IsVisible="False"
+                Stroke="#3B82F6" StrokeThickness="1"
+                BackgroundColor="#132032" Padding="12">
+            <Border.StrokeShape>
+                <RoundRectangle CornerRadius="8" />
+            </Border.StrokeShape>
+            <VerticalStackLayout Spacing="8">
+                <Label x:Name="AgentPreviewTitle" TextColor="White" FontSize="16" FontAttributes="Bold" />
+                <Label x:Name="AgentPreviewSummary" TextColor="#D8E0EA" FontSize="13" LineBreakMode="WordWrap" />
+                <Editor x:Name="AgentPreviewEditor" IsVisible="False"
+                        AutoSize="TextChanges" BackgroundColor="#252B33"
+                        TextColor="White" HeightRequest="160" />
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                    <Button Text="Apply" Clicked="OnApplyPreview"
+                            BackgroundColor="#15803D" TextColor="White" CornerRadius="8" />
+                    <Button Grid.Column="1" Text="Modify" Clicked="OnEditPreview"
+                            BackgroundColor="#334155" TextColor="White" CornerRadius="8" />
+                    <Button Grid.Column="2" Text="Cancel" Clicked="OnCancelPreview"
+                            BackgroundColor="#7F1D1D" TextColor="White" CornerRadius="8" />
+                </Grid>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Input row -->
+        <VerticalStackLayout Grid.Row="3" Spacing="8">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+                <Button x:Name="AgentConversationButton" Text="Talk"
+                        Clicked="OnConversation"
+                        BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+                <Button x:Name="AgentDictateButton" Grid.Column="1" Text="Dictate"
+                        Clicked="OnDictate"
+                        BackgroundColor="#334155" TextColor="White" CornerRadius="8" />
+                <Slider x:Name="AgentVoiceRateSlider" Grid.Column="2"
+                        Minimum="0.75" Maximum="1.45" Value="1.05" />
+                <Label x:Name="AgentVoiceRateLabel" Grid.Column="3"
+                       Text="1.05x" TextColor="#AEB6C2" VerticalTextAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Editor x:Name="AgentInputEditor"
+                        Placeholder="Message the agent..."
+                        AutoSize="TextChanges"
+                        BackgroundColor="#252B33" TextColor="White"
+                        PlaceholderColor="#AEB6C2" HeightRequest="48" />
+                <Button Grid.Column="1" Text="Send" Clicked="OnSendText"
+                        BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+            </Grid>
+        </VerticalStackLayout>
+
+    </Grid>
+</ContentPage>

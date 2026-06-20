@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="JTS_App.Pages.ProjectsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:entities="using:JTS.Data.Entities"
+    xmlns:local="using:JTS_App.Pages"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:JTS_App.ViewModels"
+    mc:Ignorable="d">
+
+    <Grid Padding="28,22,28,28" RowSpacing="18" Background="#181B20" ColumnSpacing="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="1*" MinWidth="300" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.ColumnSpan="2" Spacing="4">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Projects" />
+            <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Projects are synchronized from D365CE jts_proyecto." />
+        </StackPanel>
+
+        <!-- Project list -->
+        <Border Grid.Row="1" Style="{StaticResource PanelBorderStyle}">
+            <Grid RowSpacing="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Project list" />
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+                    <Button Click="SyncD365_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="14" Glyph="&#xE895;" />
+                            <TextBlock Text="Sync D365CE" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind ViewModel.Status, Mode=OneWay}" TextWrapping="Wrap" />
+                </StackPanel>
+                <TreeView
+                    Grid.Row="2"
+                    ItemsSource="{x:Bind ViewModel.RootNodes, Mode=OneWay}"
+                    SelectionMode="Single"
+                    SelectionChanged="Tree_SelectionChanged">
+                    <TreeView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ProjectTreeNode">
+                            <TreeViewItem ItemsSource="{x:Bind Children}">
+                                <TreeViewItem.Content>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="12"
+                                            Height="12"
+                                            Background="{x:Bind Project.ColorHex, Mode=OneTime, Converter={StaticResource ProjectColorBrushConverter}}"
+                                            CornerRadius="6"
+                                            VerticalAlignment="Center" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            Text="{x:Bind DisplayName, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </TreeViewItem.Content>
+                            </TreeViewItem>
+                        </DataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </Grid>
+        </Border>
+
+        <!-- Detail pane -->
+        <Border
+            Grid.Row="1"
+            Grid.Column="1"
+            Style="{StaticResource PanelBorderStyle}">
+            <ScrollViewer VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
+            <Grid RowSpacing="16" Visibility="{x:Bind ViewModel.SelectedNode, Mode=OneWay, Converter={StaticResource NotNullToVisibilityConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.SelectedNode.Project.Name, Mode=OneWay, FallbackValue=''}" TextWrapping="Wrap" />
+                    <Border
+                        x:Name="SelectedProjectColorPreview"
+                        Height="42"
+                        CornerRadius="8"
+                        Background="#1D4ED8"
+                        BorderBrush="#FFFFFF"
+                        BorderThickness="1">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="#FFFFFF"
+                            FontWeight="SemiBold"
+                            Text="Project color" />
+                    </Border>
+                </StackPanel>
+
+                <TextBlock
+                    Grid.Row="1"
+                    Style="{StaticResource MutedTextBlockStyle}"
+                    Text="{x:Bind ViewModel.SelectedNode.Project.Description, Mode=OneWay, FallbackValue=''}"
+                    TextWrapping="Wrap" />
+
+                <StackPanel Grid.Row="2" Spacing="8">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Time per day" />
+                        <TextBlock
+                            Grid.Column="1"
+                            Style="{StaticResource MutedTextBlockStyle}"
+                            Text="{x:Bind ViewModel.SelectedProjectTimeTotalText, Mode=OneWay}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedProjectTimeByDay, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProjectTimeByDayView">
+                                <Grid Padding="0,4,0,4" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind DateText}" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind TimeText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Grid.Row="3" Spacing="8">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Color" />
+                    <ColorPicker
+                        x:Name="ProjectColorPicker"
+                        ColorChanged="ProjectColorPicker_ColorChanged"
+                        IsAlphaEnabled="False"
+                        IsColorChannelTextInputVisible="True"
+                        IsColorPreviewVisible="True"
+                        IsColorSliderVisible="True"
+                        IsColorSpectrumVisible="True"
+                        IsHexInputVisible="True" />
+                    <Button Click="SaveProjectColor_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="14" Glyph="&#xE74E;" />
+                            <TextBlock Text="Save color" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Relations -->
+                <StackPanel Grid.Row="4" Spacing="8">
+                    <StackPanel Spacing="8">
+                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Related projects" />
+                        <Button Click="AddRelation_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="12" Glyph="&#xE71B;" />
+                                <TextBlock Text="Link project" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedProjectRelations, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProjectRelationView">
+                                <Grid Padding="0,4,0,4" ColumnSpacing="8" RowSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="{x:Bind ToProjectName}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Click="RemoveRelation_Click" Tag="{x:Bind Id}">
+                                        <FontIcon FontSize="12" Glyph="&#xE74D;" />
+                                    </Button>
+                                    <TextBlock Grid.Row="1" Text="{x:Bind RelationType}" Style="{StaticResource MutedTextBlockStyle}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind Note}" Style="{StaticResource MutedTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- Top-level tasks -->
+                <StackPanel Grid.Row="5" Spacing="8">
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Tasks (top level)" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedProjectTasks, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="entities:TaskItem">
+                                <Grid Padding="0,4,0,4" ColumnSpacing="8" RowSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="{x:Bind Title}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Status}" Style="{StaticResource MutedTextBlockStyle}" />
+                                    <TextBlock Grid.Row="1" Text="{x:Bind WorkType}" Style="{StaticResource MutedTextBlockStyle}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Grid>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Page>

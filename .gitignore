@@ -1,0 +1,105 @@
+# ============================================================
+#  JTS Project .gitignore  (.NET 10 / WinUI 3 / .NET MAUI)
+# ============================================================
+
+# ----- Build output -----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+.winapp/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+**/[Pp]ublish/
+
+# ----- Visual Studio / Rider / VS Code -----
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.rsuser
+.DS_Store
+Thumbs.db
+
+# ----- MSBuild / Restore -----
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+*.binlog
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# ----- .NET / NuGet -----
+*.nupkg
+*.snupkg
+.packages/
+**/packages/*
+!**/packages/build/
+
+# ----- Test results / coverage -----
+[Tt]est[Rr]esult*/
+[Cc]overage*/
+*.coverage
+*.coveragexml
+*.trx
+
+# ----- WinUI 3 / MSIX packaging -----
+AppX/
+AppPackages/
+BundleArtifacts/
+*.appx
+*.appxbundle
+*.appxupload
+*.msix
+*.msixbundle
+*.msixupload
+GeneratedArtifacts/
+_pkginfo.txt
+
+# ----- .NET MAUI / Android build -----
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# ============================================================
+#  SECRETS & CREDENTIALS — never commit these
+# ============================================================
+# Signing certificates / keys
+*.pfx
+*.p12
+*.snk
+*.pem
+*.key
+*.cer
+*.crt
+
+# Secret / local config files
+secrets.json
+appsettings.*.json
+!appsettings.json
+.env
+.env.*
+*.local.json
+
+# Local AI models (downloaded at runtime, large binaries)
+*.bin
+*.gguf
+*.onnx
+ggml-*.bin
+vosk-model-*/
+
+# ----- Tooling / local agents -----
+.codex-tmp/
+.claude/settings.local.json
+
+# ----- Local-only (not published) -----
+scripts/
+Launch-JTS.cmd

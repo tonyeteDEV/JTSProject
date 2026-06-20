@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JTS.AI/JTS.AI.csproj" />
+    <Project Path="src/JTS.App/JTS.App.csproj" />
+    <Project Path="src/JTS.Core/JTS.Core.csproj" />
+    <Project Path="src/JTS.Data/JTS.Data.csproj" />
+  </Folder>
+</Solution>

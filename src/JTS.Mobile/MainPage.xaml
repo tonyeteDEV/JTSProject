@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JTS.Mobile.MainPage"
+             BackgroundColor="#111418">
+    <Grid RowDefinitions="Auto,Auto,*" Padding="16,12">
+        <VerticalStackLayout Grid.Row="0" Spacing="4">
+            <Label Text="JTS" FontSize="28" FontAttributes="Bold" TextColor="White" />
+            <Label x:Name="StatusLabel" Text="Getting ready..." FontSize="13" TextColor="#AEB6C2" />
+        </VerticalStackLayout>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*" ColumnSpacing="8" Margin="0,14,0,12">
+            <Button x:Name="AgentTabButton" Text="Agent" Clicked="ShowAgent_Clicked" BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+            <Button x:Name="TasksTabButton" Grid.Column="1" Text="Tasks" Clicked="ShowTasks_Clicked" BackgroundColor="#252B33" TextColor="White" CornerRadius="8" />
+            <Button x:Name="FocusTabButton" Grid.Column="2" Text="Focus" Clicked="ShowFocus_Clicked" BackgroundColor="#252B33" TextColor="White" CornerRadius="8" />
+            <Button x:Name="SettingsTabButton" Grid.Column="3" Text="Settings" Clicked="ShowSettings_Clicked" BackgroundColor="#252B33" TextColor="White" CornerRadius="8" />
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid x:Name="AgentView" RowDefinitions="*,Auto,Auto" RowSpacing="10">
+                <CollectionView x:Name="AgentMessageList">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border Stroke="#354052" StrokeThickness="1" BackgroundColor="{Binding BubbleColor}" Padding="12" Margin="0,0,0,8">
+                                <Border.StrokeShape>
+                                    <RoundRectangle CornerRadius="8" />
+                                </Border.StrokeShape>
+                                <VerticalStackLayout Spacing="4">
+                                    <Label Text="{Binding Author}" TextColor="#AEB6C2" FontSize="12" FontAttributes="Bold" />
+                                    <Label Text="{Binding Content}" TextColor="White" FontSize="14" LineBreakMode="WordWrap" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Border x:Name="AgentPreviewPanel" Grid.Row="1" IsVisible="False" Stroke="#3B82F6" StrokeThickness="1" BackgroundColor="#132032" Padding="12">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="8" />
+                    </Border.StrokeShape>
+                    <VerticalStackLayout Spacing="8">
+                        <Label x:Name="AgentPreviewTitle" TextColor="White" FontSize="16" FontAttributes="Bold" />
+                        <Label x:Name="AgentPreviewSummary" TextColor="#D8E0EA" FontSize="13" LineBreakMode="WordWrap" />
+                        <Editor x:Name="AgentPreviewEditor" IsVisible="False" AutoSize="TextChanges" BackgroundColor="#252B33" TextColor="White" HeightRequest="160" />
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                            <Button Text="Apply" Clicked="ApplyAgentPreview_Clicked" BackgroundColor="#15803D" TextColor="White" CornerRadius="8" />
+                            <Button Grid.Column="1" Text="Modify" Clicked="EditAgentPreview_Clicked" BackgroundColor="#334155" TextColor="White" CornerRadius="8" />
+                            <Button Grid.Column="2" Text="Cancel" Clicked="CancelAgentPreview_Clicked" BackgroundColor="#7F1D1D" TextColor="White" CornerRadius="8" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout Grid.Row="2" Spacing="8">
+                    <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+                        <Button x:Name="AgentConversationButton" Text="Talk" Clicked="AgentConversation_Clicked" BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+                        <Button x:Name="AgentDictateButton" Grid.Column="1" Text="Dictate" Clicked="AgentDictate_Clicked" BackgroundColor="#334155" TextColor="White" CornerRadius="8" />
+                        <Slider x:Name="AgentVoiceRateSlider" Grid.Column="2" Minimum="0.75" Maximum="1.45" Value="1.05" />
+                        <Label x:Name="AgentVoiceRateLabel" Grid.Column="3" Text="1.05x" TextColor="#AEB6C2" VerticalTextAlignment="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Editor x:Name="AgentInputEditor" Placeholder="Message the agent..." AutoSize="TextChanges" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" HeightRequest="48" />
+                        <Button Grid.Column="1" Text="Send" Clicked="SendAgentText_Clicked" BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Grid>
+
+            <RefreshView x:Name="TasksView" IsVisible="False" Refreshing="TasksView_Refreshing">
+                <ScrollView>
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <Picker x:Name="HorizonPicker" SelectedIndexChanged="HorizonPicker_SelectedIndexChanged"
+                                    BackgroundColor="#252B33" TextColor="White" TitleColor="#AEB6C2" />
+                            <Button Grid.Column="1" Text="+" Clicked="NewTask_Clicked" WidthRequest="48" BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+                        </Grid>
+
+                        <CollectionView x:Name="TaskList" SelectionMode="Single" SelectionChanged="TaskList_SelectionChanged">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Stroke="#354052" StrokeThickness="1" BackgroundColor="#20262F" Padding="12" Margin="0,0,0,8">
+                                        <Border.StrokeShape>
+                                            <RoundRectangle CornerRadius="8" />
+                                        </Border.StrokeShape>
+                                        <VerticalStackLayout Spacing="5">
+                                            <Label Text="{Binding Title}" TextColor="White" FontSize="16" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                            <Label Text="{Binding Meta}" TextColor="#AEB6C2" FontSize="12" LineBreakMode="TailTruncation" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+
+                        <Border x:Name="TaskDetailPanel" IsVisible="False" Stroke="#3B82F6" StrokeThickness="1" BackgroundColor="#142033" Padding="14">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="8" />
+                            </Border.StrokeShape>
+                            <VerticalStackLayout Spacing="10">
+                                <Label x:Name="TaskTitleLabel" TextColor="White" FontSize="19" FontAttributes="Bold" />
+                                <Label x:Name="TaskMetaLabel" TextColor="#B9C3D1" FontSize="13" />
+                                <Label x:Name="TaskDescriptionLabel" TextColor="#E5E7EB" FontSize="14" />
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                    <Button Text="Done" Clicked="MarkDone_Clicked" BackgroundColor="#15803D" TextColor="White" CornerRadius="8" />
+                                    <Button Grid.Column="1" Text="Comment" Clicked="AddComment_Clicked" BackgroundColor="#334155" TextColor="White" CornerRadius="8" />
+                                </Grid>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </RefreshView>
+
+            <ScrollView x:Name="FocusView" IsVisible="False">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="Time by task" TextColor="White" FontSize="22" FontAttributes="Bold" />
+                    <Picker x:Name="FocusTaskPicker" Title="Select a task" BackgroundColor="#252B33" TextColor="White" TitleColor="#AEB6C2" />
+                    <Label x:Name="TimerLabel" Text="00:00:00" TextColor="White" FontSize="42" HorizontalTextAlignment="Center" FontAttributes="Bold" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button x:Name="StartStopButton" Text="Start" Clicked="StartStop_Clicked" BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+                        <Button Grid.Column="1" Text="Save time" Clicked="SaveTime_Clicked" BackgroundColor="#15803D" TextColor="White" CornerRadius="8" />
+                    </Grid>
+                    <Editor x:Name="FocusNoteEditor" Placeholder="Optional comment..." AutoSize="TextChanges" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" HeightRequest="96" />
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <ScrollView x:Name="SettingsView" IsVisible="False">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Dataverse connection" TextColor="White" FontSize="22" FontAttributes="Bold" />
+                    <Entry x:Name="EnvironmentEntry" Placeholder="https://org.crm4.dynamics.com" Keyboard="Plain" IsTextPredictionEnabled="False" IsSpellCheckEnabled="False" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" />
+                    <Entry x:Name="TenantEntry" Placeholder="Tenant ID" Keyboard="Plain" IsTextPredictionEnabled="False" IsSpellCheckEnabled="False" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" />
+                    <Entry x:Name="ClientEntry" Placeholder="Client ID" Keyboard="Plain" IsTextPredictionEnabled="False" IsSpellCheckEnabled="False" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Entry x:Name="SecretEntry" Placeholder="Client secret value" IsPassword="True" Keyboard="Plain" IsTextPredictionEnabled="False" IsSpellCheckEnabled="False" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" />
+                        <Button Grid.Column="1" Text="Paste" Clicked="PasteSecret_Clicked" BackgroundColor="#334155" TextColor="White" CornerRadius="8" />
+                    </Grid>
+                    <Label x:Name="SecretHintLabel" Text="Paste the client secret VALUE, not the Secret ID." TextColor="#AEB6C2" FontSize="12" />
+                    <BoxView HeightRequest="1" BackgroundColor="#354052" Margin="0,8" />
+                    <Label Text="AI agent" TextColor="White" FontSize="18" FontAttributes="Bold" />
+                    <Entry x:Name="DeepSeekKeyEntry" Placeholder="DeepSeek API key" IsPassword="True" Keyboard="Plain" IsTextPredictionEnabled="False" IsSpellCheckEnabled="False" BackgroundColor="#252B33" TextColor="White" PlaceholderColor="#AEB6C2" />
+                    <Picker x:Name="DeepSeekModelPicker" Title="Model" BackgroundColor="#252B33" TextColor="White" TitleColor="#AEB6C2" />
+                    <HorizontalStackLayout Spacing="8">
+                        <CheckBox x:Name="DeepSeekThinkingCheckBox" Color="#3B82F6" />
+                        <Label Text="Thinking" TextColor="White" VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
+                    <Button Text="Save and test" Clicked="SaveSettings_Clicked" BackgroundColor="#2563EB" TextColor="White" CornerRadius="8" />
+                    <Label Text="The secret is stored in the phone's secure storage. Use the same service user you use on desktop." TextColor="#AEB6C2" FontSize="13" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
+    </Grid>
+</ContentPage>

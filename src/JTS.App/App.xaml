@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="JTS_App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:JTS_App.Converters"
+    xmlns:local="using:JTS_App"
+    RequestedTheme="Dark">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Style x:Key="PanelBorderStyle" TargetType="Border">
+                <Setter Property="Padding" Value="18" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="#22262D" />
+                <Setter Property="BorderBrush" Value="#3A414C" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+
+            <Style x:Key="MetricCardBorderStyle" TargetType="Border">
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="#22262D" />
+                <Setter Property="BorderBrush" Value="#3A414C" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="MinHeight" Value="86" />
+            </Style>
+
+            <Style x:Key="MutedTextBlockStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="#AAB4C2" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style
+                x:Key="JtsAccentButtonStyle"
+                BasedOn="{StaticResource AccentButtonStyle}"
+                TargetType="Button">
+                <Setter Property="Foreground" Value="#FFFFFFFF" />
+            </Style>
+
+            <converters:NotNullToBoolConverter x:Key="NotNullToBoolConverter" />
+            <converters:NotNullToVisibilityConverter x:Key="NotNullToVisibilityConverter" />
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:RecordingButtonBackgroundConverter x:Key="RecordingButtonBackgroundConverter" />
+            <converters:RecordingButtonForegroundConverter x:Key="RecordingButtonForegroundConverter" />
+            <converters:ProjectColorBrushConverter x:Key="ProjectColorBrushConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

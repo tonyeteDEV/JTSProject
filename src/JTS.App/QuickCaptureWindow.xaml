@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="JTS_App.QuickCaptureWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:entities="using:JTS.Data.Entities"
+    xmlns:vm="using:JTS_App.ViewModels"
+    Title="Quick Capture">
+
+    <Grid
+        x:Name="RootGrid"
+        Width="640"
+        Height="700"
+        Padding="22"
+        Background="#181B20"
+        RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Spacing="4">
+            <TextBlock Text="Quick Capture" Style="{StaticResource TitleTextBlockStyle}" />
+            <TextBlock Text="Capture a raw thought and turn it into one or more tasks." Style="{StaticResource MutedTextBlockStyle}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Grid.RowSpan="4" Style="{StaticResource PanelBorderStyle}">
+        <Grid RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <ComboBox
+                Header="Default project"
+                DisplayMemberPath="Name"
+                ItemsSource="{x:Bind ViewModel.Projects, Mode=OneWay}"
+                SelectedItem="{x:Bind ViewModel.SelectedVoiceProject, Mode=TwoWay}" />
+
+            <TextBox
+                Grid.Row="1"
+                AcceptsReturn="True"
+                PlaceholderText="Speak, transcribe, or type task ideas here..."
+                Text="{x:Bind ViewModel.VoiceTranscript, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                TextWrapping="Wrap" />
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
+                <Button
+                    x:Name="VoiceRecordButton"
+                    Click="Record_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon x:Name="VoiceRecordIcon" FontSize="14" Glyph="&#xE720;" />
+                        <TextBlock x:Name="VoiceRecordLabel" Text="Record" />
+                    </StackPanel>
+                </Button>
+                <Button Click="Create_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE710;" />
+                        <TextBlock x:Name="CreatePreviewLabel" Text="Preview task" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <StackPanel Grid.Row="3" Spacing="10">
+                <Border
+                    x:Name="TaskPreviewPanel"
+                    Padding="12"
+                    Background="#2B3038"
+                    BorderBrush="#3A414C"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Visibility="Collapsed">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Task preview" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.PreviewTitle, Mode=OneWay}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind ViewModel.PreviewDescription, Mode=OneWay}" Style="{StaticResource MutedTextBlockStyle}" MaxLines="3" TextTrimming="CharacterEllipsis" />
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Bind ViewModel.PreviewProjectName, Mode=OneWay}" Style="{StaticResource MutedTextBlockStyle}" />
+                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.PreviewPriority, Mode=OneWay}" Style="{StaticResource MutedTextBlockStyle}" />
+                        </Grid>
+                        <TextBlock Text="Checklist" Style="{StaticResource BodyStrongTextBlockStyle}" Margin="0,4,0,2" />
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.PreviewChecklistItems, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,2">
+                                        <FontIcon FontSize="12" Glyph="&#xE739;" />
+                                        <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <TextBlock
+                    Style="{StaticResource MutedTextBlockStyle}"
+                    Text="{x:Bind ViewModel.VoiceStatus, Mode=OneWay}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+        </Border>
+    </Grid>
+</Window>

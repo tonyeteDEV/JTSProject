@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JTS.Mobile.Pages.FocusPage"
+             Title="Focus"
+             BackgroundColor="#111418">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="16" Padding="16,14,16,24">
+
+            <Label Text="Focus" FontSize="24" FontAttributes="Bold" TextColor="White" />
+            <Label x:Name="StatusLabel" Text="" FontSize="13" TextColor="#AEB6C2" />
+
+            <!-- Task picker -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Task" TextColor="#9CA3AF" FontSize="13" />
+                <Picker x:Name="FocusTaskPicker"
+                        Title="Select a task"
+                        BackgroundColor="#1E293B" TextColor="White" TitleColor="#6B7280"
+                        HeightRequest="48" />
+            </VerticalStackLayout>
+
+            <!-- Timer display -->
+            <Border Padding="20,28" BackgroundColor="#141B26" Stroke="#1E293B" StrokeThickness="1" Margin="0,8">
+                <Border.StrokeShape><RoundRectangle CornerRadius="16" /></Border.StrokeShape>
+                <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                    <Label x:Name="TimerLabel" Text="00:00:00"
+                           TextColor="White" FontSize="52" FontAttributes="Bold"
+                           HorizontalTextAlignment="Center" />
+                    <Label x:Name="SessionLabel" Text=""
+                           TextColor="#6B7280" FontSize="13"
+                           HorizontalTextAlignment="Center" />
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Controls -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                <Button x:Name="StartStopButton" Text="Start"
+                        Clicked="OnStartStop"
+                        BackgroundColor="#2563EB" TextColor="White"
+                        CornerRadius="10" HeightRequest="48" />
+                <Button Grid.Column="1" Text="Save time"
+                        Clicked="OnSaveTime"
+                        BackgroundColor="#15803D" TextColor="White"
+                        CornerRadius="10" HeightRequest="48" />
+            </Grid>
+            <Button Text="Reset" Clicked="OnReset"
+                    BackgroundColor="#374151" TextColor="#9CA3AF"
+                    CornerRadius="10" HeightRequest="40" />
+
+            <!-- Note -->
+            <VerticalStackLayout Spacing="6">
+                <Label Text="Note (optional)" TextColor="#9CA3AF" FontSize="13" />
+                <Editor x:Name="FocusNoteEditor"
+                        Placeholder="What did you work on?"
+                        AutoSize="TextChanges"
+                        BackgroundColor="#1E293B" TextColor="White" PlaceholderColor="#6B7280"
+                        HeightRequest="80" />
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

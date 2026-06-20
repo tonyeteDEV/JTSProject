@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="JTS_App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:JTS_App"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:services="using:JTS_App.Services"
+    Title="JTS"
+    mc:Ignorable="d">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid
+        x:Name="RootGrid"
+        Background="#181B20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar
+            x:Name="AppTitleBar"
+            Title="JTS"
+            BackRequested="TitleBar_BackRequested"
+            IsBackButtonVisible="{x:Bind NavFrame.CanGoBack, Mode=OneWay}"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <Button
+            x:Name="RefreshCurrentPageButton"
+            Grid.Row="0"
+            MinWidth="116"
+            Height="32"
+            Margin="0,8,148,8"
+            Padding="12,0"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center"
+            Click="RefreshCurrentPage_Click"
+            Background="#252B33"
+            BorderBrush="#3A414C"
+            Foreground="#F4F7FB"
+            ToolTipService.ToolTip="Refresh the current screen's data">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <FontIcon FontSize="14" Glyph="&#xE72C;" />
+                <TextBlock Text="Refresh" />
+            </StackPanel>
+        </Button>
+
+        <NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            Background="#181B20"
+            CompactPaneLength="60"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            OpenPaneLength="228"
+            PaneDisplayMode="Left"
+            SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem
+                    Content="Agent"
+                    IsSelected="True"
+                    Tag="assistant">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE99A;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Dashboard" Tag="dashboard">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE9D2;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Tasks" Tag="tasks">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE762;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Planner" Tag="planner">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE787;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Focus" Tag="focus">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE916;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.PaneFooter>
+                <StackPanel
+                    Margin="18,8,18,14"
+                    Spacing="8">
+                    <ItemsControl ItemsSource="{x:Bind Preload.Items, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="services:PreloadProgressItem">
+                                <Grid Margin="0,1,0,1" ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse
+                                        Width="7"
+                                        Height="7"
+                                        VerticalAlignment="Center"
+                                        Fill="{Binding ColorHex, Converter={StaticResource ProjectColorBrushConverter}}" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Foreground="#C8D1DC"
+                                        FontSize="11"
+                                        Text="{Binding Label}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Grid.Column="2"
+                                        Foreground="#7F8A99"
+                                        FontSize="10"
+                                        Text="{Binding StatusText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock
+                        Foreground="#C8D1DC"
+                        FontSize="12"
+                        Text="JTS" />
+                    <TextBlock
+                        Foreground="#7F8A99"
+                        FontSize="11"
+                        Text="{x:Bind AppVersionDisplay, Mode=OneWay}" />
+                </StackPanel>
+            </NavigationView.PaneFooter>
+            <Frame x:Name="NavFrame" />
+        </NavigationView>
+    </Grid>
+</Window>

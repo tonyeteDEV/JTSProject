@@ -1,0 +1,618 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="JTS_App.Pages.TasksPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:JTS_App.ViewModels"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <Style x:Key="KanbanItemStyle" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <DataTemplate x:Key="KanbanCardTemplate" x:DataType="vm:TaskRowView">
+            <Border
+                Padding="12"
+                Background="{x:Bind ProjectColorHex, Converter={StaticResource ProjectColorBrushConverter}}"
+                CornerRadius="8">
+                <StackPanel Spacing="4">
+                    <TextBlock
+                        FontWeight="SemiBold"
+                        Foreground="#FFFFFF"
+                        Text="{x:Bind Title}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="#CCFFFFFF"
+                        Text="{x:Bind ProjectName}"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        FontSize="11"
+                        Foreground="#AAFFFFFF"
+                        Text="{x:Bind CustomerName}"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind HasCustomerName, Converter={StaticResource BoolToVisibilityConverter}}" />
+                    <Grid Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            FontSize="15"
+                            FontWeight="Bold"
+                            Foreground="{x:Bind PriorityBrush}"
+                            Text="{x:Bind PriorityIcon}"
+                            VerticalAlignment="Center" />
+                        <Border
+                            Grid.Column="2"
+                            Padding="6,3"
+                            Background="#33000000"
+                            CornerRadius="4"
+                            Visibility="{x:Bind HasDueDate, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock FontSize="11" Foreground="#FFFFFF" Text="{x:Bind Due}" />
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid
+        x:Name="RootGrid"
+        Padding="28,22,28,28"
+        Background="#181B20"
+        ColumnSpacing="18"
+        RowSpacing="18"
+        SizeChanged="RootGrid_SizeChanged">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="BoardColumn" Width="*" />
+            <ColumnDefinition x:Name="DetailsColumn" Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.ColumnSpan="2" Spacing="4">
+            <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Tasks" />
+            <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Plan work, estimate effort, track completion, and keep a journal." />
+        </StackPanel>
+
+        <!-- Toolbar -->
+        <Border
+            Grid.Row="1"
+            Grid.ColumnSpan="2"
+            Padding="12"
+            Background="#2B3038"
+            CornerRadius="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Click="AddTask_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE710;" />
+                        <TextBlock Text="New task" />
+                    </StackPanel>
+                </Button>
+                <Button Click="EditTask_Click" IsEnabled="{x:Bind ViewModel.CanEditSelectedTask, Mode=OneWay}">
+                    <FontIcon FontSize="14" Glyph="&#xE70F;" />
+                </Button>
+                <Button Click="DeleteTask_Click" IsEnabled="{x:Bind ViewModel.CanDeleteSelectedTask, Mode=OneWay}">
+                    <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Kanban board — 6 equal columns -->
+        <Grid x:Name="KanbanBoard" Grid.Row="2" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ── Assigned ── -->
+            <Border Grid.Column="0" Padding="0" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="8,8,0,0" Padding="14,10" Background="#252B3B">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="3" CornerRadius="2" Background="#3B82F6" VerticalAlignment="Stretch" />
+                            <TextBlock FontWeight="SemiBold" Text="Assigned" VerticalAlignment="Center" />
+                            <Border Padding="7,2" Background="#333B82F6" CornerRadius="10" VerticalAlignment="Center">
+                                <TextBlock FontSize="12" Text="{x:Bind ViewModel.AssignedCount, Mode=OneWay}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ListView
+                        x:Name="AssignedList"
+                        Grid.Row="1"
+                        Padding="8"
+                        AllowDrop="True"
+                        CanDragItems="True"
+                        IsItemClickEnabled="True"
+                        ItemClick="TaskCard_ItemClick"
+                        ItemContainerStyle="{StaticResource KanbanItemStyle}"
+                        ItemTemplate="{StaticResource KanbanCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.AssignedTasks, Mode=OneWay}"
+                        SelectionMode="None"
+                        DragItemsStarting="KanbanList_DragItemsStarting"
+                        DragOver="KanbanList_DragOver"
+                        Drop="KanbanList_Drop" />
+                </Grid>
+            </Border>
+
+            <!-- ── Ongoing (InProgress + Blocked) ── -->
+            <Border Grid.Column="1" Padding="0" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="8,8,0,0" Padding="14,10" Background="#252B3B">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="3" CornerRadius="2" Background="#F59E0B" VerticalAlignment="Stretch" />
+                            <TextBlock FontWeight="SemiBold" Text="Ongoing" VerticalAlignment="Center" />
+                            <Border Padding="7,2" Background="#33F59E0B" CornerRadius="10" VerticalAlignment="Center">
+                                <TextBlock FontSize="12" Text="{x:Bind ViewModel.OngoingCount, Mode=OneWay}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ListView
+                        x:Name="OngoingList"
+                        Grid.Row="1"
+                        Padding="8"
+                        AllowDrop="True"
+                        CanDragItems="True"
+                        IsItemClickEnabled="True"
+                        ItemClick="TaskCard_ItemClick"
+                        ItemContainerStyle="{StaticResource KanbanItemStyle}"
+                        ItemTemplate="{StaticResource KanbanCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.OngoingTasks, Mode=OneWay}"
+                        SelectionMode="None"
+                        DragItemsStarting="KanbanList_DragItemsStarting"
+                        DragOver="KanbanList_DragOver"
+                        Drop="KanbanList_Drop" />
+                </Grid>
+            </Border>
+
+            <!-- ── Testing ── -->
+            <Border Grid.Column="2" Padding="0" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="8,8,0,0" Padding="14,10" Background="#252B3B">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="3" CornerRadius="2" Background="#8B5CF6" VerticalAlignment="Stretch" />
+                            <TextBlock FontWeight="SemiBold" Text="Testing" VerticalAlignment="Center" />
+                            <Border Padding="7,2" Background="#338B5CF6" CornerRadius="10" VerticalAlignment="Center">
+                                <TextBlock FontSize="12" Text="{x:Bind ViewModel.TestingCount, Mode=OneWay}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ListView
+                        x:Name="TestingList"
+                        Grid.Row="1"
+                        Padding="8"
+                        AllowDrop="True"
+                        CanDragItems="True"
+                        IsItemClickEnabled="True"
+                        ItemClick="TaskCard_ItemClick"
+                        ItemContainerStyle="{StaticResource KanbanItemStyle}"
+                        ItemTemplate="{StaticResource KanbanCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.TestingTasks, Mode=OneWay}"
+                        SelectionMode="None"
+                        DragItemsStarting="KanbanList_DragItemsStarting"
+                        DragOver="KanbanList_DragOver"
+                        Drop="KanbanList_Drop" />
+                </Grid>
+            </Border>
+
+            <!-- ── Tested ── -->
+            <Border Grid.Column="3" Padding="0" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="8,8,0,0" Padding="14,10" Background="#252B3B">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="3" CornerRadius="2" Background="#14B8A6" VerticalAlignment="Stretch" />
+                            <TextBlock FontWeight="SemiBold" Text="Tested" VerticalAlignment="Center" />
+                            <Border Padding="7,2" Background="#3314B8A6" CornerRadius="10" VerticalAlignment="Center">
+                                <TextBlock FontSize="12" Text="{x:Bind ViewModel.TestedCount, Mode=OneWay}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ListView
+                        x:Name="TestedList"
+                        Grid.Row="1"
+                        Padding="8"
+                        AllowDrop="True"
+                        CanDragItems="True"
+                        IsItemClickEnabled="True"
+                        ItemClick="TaskCard_ItemClick"
+                        ItemContainerStyle="{StaticResource KanbanItemStyle}"
+                        ItemTemplate="{StaticResource KanbanCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.TestedTasks, Mode=OneWay}"
+                        SelectionMode="None"
+                        DragItemsStarting="KanbanList_DragItemsStarting"
+                        DragOver="KanbanList_DragOver"
+                        Drop="KanbanList_Drop" />
+                </Grid>
+            </Border>
+
+            <!-- ── UAT ── -->
+            <Border Grid.Column="4" Padding="0" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="8,8,0,0" Padding="14,10" Background="#252B3B">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="3" CornerRadius="2" Background="#EC4899" VerticalAlignment="Stretch" />
+                            <TextBlock FontWeight="SemiBold" Text="UAT" VerticalAlignment="Center" />
+                            <Border Padding="7,2" Background="#33EC4899" CornerRadius="10" VerticalAlignment="Center">
+                                <TextBlock FontSize="12" Text="{x:Bind ViewModel.UatCount, Mode=OneWay}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ListView
+                        x:Name="UatList"
+                        Grid.Row="1"
+                        Padding="8"
+                        AllowDrop="True"
+                        CanDragItems="True"
+                        IsItemClickEnabled="True"
+                        ItemClick="TaskCard_ItemClick"
+                        ItemContainerStyle="{StaticResource KanbanItemStyle}"
+                        ItemTemplate="{StaticResource KanbanCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.UatTasks, Mode=OneWay}"
+                        SelectionMode="None"
+                        DragItemsStarting="KanbanList_DragItemsStarting"
+                        DragOver="KanbanList_DragOver"
+                        Drop="KanbanList_Drop" />
+                </Grid>
+            </Border>
+
+            <!-- ── Production (Done) ── -->
+            <Border Grid.Column="5" Padding="0" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="8,8,0,0" Padding="14,10" Background="#252B3B">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Width="3" CornerRadius="2" Background="#10B981" VerticalAlignment="Stretch" />
+                            <TextBlock FontWeight="SemiBold" Text="Production" VerticalAlignment="Center" />
+                            <Border Padding="7,2" Background="#3310B981" CornerRadius="10" VerticalAlignment="Center">
+                                <TextBlock FontSize="12" Text="{x:Bind ViewModel.ProductionCount, Mode=OneWay}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ListView
+                        x:Name="ProductionList"
+                        Grid.Row="1"
+                        Padding="8"
+                        AllowDrop="True"
+                        CanDragItems="True"
+                        IsItemClickEnabled="True"
+                        ItemClick="TaskCard_ItemClick"
+                        ItemContainerStyle="{StaticResource KanbanItemStyle}"
+                        ItemTemplate="{StaticResource KanbanCardTemplate}"
+                        ItemsSource="{x:Bind ViewModel.ProductionTasks, Mode=OneWay}"
+                        SelectionMode="None"
+                        DragItemsStarting="KanbanList_DragItemsStarting"
+                        DragOver="KanbanList_DragOver"
+                        Drop="KanbanList_Drop" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Detail panel -->
+        <Border
+            x:Name="TaskDetailPanel"
+            Grid.Row="2"
+            Grid.Column="1"
+            Width="460"
+            Style="{StaticResource PanelBorderStyle}"
+            Visibility="{x:Bind ViewModel.SelectedTask, Mode=OneWay, Converter={StaticResource NotNullToVisibilityConverter}}">
+            <Grid RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Task detail" />
+
+                <!-- Status mover -->
+                <ComboBox
+                    x:Name="StatusBox"
+                    Grid.Row="1"
+                    Header="Move to"
+                    HorizontalAlignment="Stretch"
+                    IsEnabled="{x:Bind ViewModel.CanChangeSelectedTaskStatus, Mode=OneWay}"
+                    SelectionChanged="StatusBox_SelectionChanged" />
+
+                <!-- Timesheet lock banner -->
+                <Border
+                    Grid.Row="2"
+                    Padding="10,8"
+                    Background="#173B2B"
+                    BorderBrush="#2F8A56"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Visibility="{x:Bind ViewModel.SelectedTaskHasTimesheetLinks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock
+                        Foreground="#D5F8DF"
+                        Text="{x:Bind ViewModel.SelectedTaskLockMessage, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                </Border>
+
+                <Grid Grid.Row="3" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Time by day" />
+                    <TextBlock
+                        Grid.Column="1"
+                        Style="{StaticResource MutedTextBlockStyle}"
+                        Text="{x:Bind ViewModel.SelectedTaskTimeTotalText, Mode=OneWay}" />
+                </Grid>
+                <ListView Grid.Row="4" MaxHeight="124" ItemsSource="{x:Bind ViewModel.SelectedTaskTimeByDay, Mode=OneWay}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TaskTimeByDayView">
+                            <Grid Padding="0,4,0,4" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="82" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Width="18"
+                                    Height="18"
+                                    Background="#2F8A56"
+                                    CornerRadius="9"
+                                    Visibility="{x:Bind IsTimesheetTransferred, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <FontIcon FontSize="10" Foreground="#FFFFFF" Glyph="&#xE73E;" />
+                                </Border>
+                                <TextBlock Grid.Column="1" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind DateText}" />
+                                <TextBlock Grid.Column="2" Text="{x:Bind TimeRangeText}" />
+                                <TextBlock Grid.Column="3" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind DurationText}" />
+                                <Button Grid.Column="4" Click="EditTimeEntry_Click" IsEnabled="{x:Bind IsEditable}">
+                                    <FontIcon FontSize="13" Glyph="&#xE70F;" />
+                                </Button>
+                                <Button Grid.Column="5" Click="DeleteTimeEntry_Click" IsEnabled="{x:Bind IsEditable}">
+                                    <FontIcon FontSize="13" Glyph="&#xE74D;" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <TextBlock Grid.Row="5" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Calendar assignments" />
+                <ListView Grid.Row="6" MaxHeight="124" ItemsSource="{x:Bind ViewModel.SelectedTaskCalendarBlocks, Mode=OneWay}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TaskCalendarBlockView">
+                            <Grid Padding="0,4,0,4" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind DateText}" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind TimeRange}" />
+                                <TextBlock Grid.Column="2" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind DurationText}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <TextBlock Grid.Row="7" Style="{StaticResource BodyStrongTextBlockStyle}" Text="What was done" />
+                <Grid Grid.Row="8" ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox
+                        x:Name="JournalBox"
+                        AcceptsReturn="True"
+                        PlaceholderText="Add a note about progress, blockers, decisions..."
+                        TextWrapping="Wrap" />
+                    <Button Grid.Column="1" VerticalAlignment="Bottom" Click="AddJournal_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                        <FontIcon FontSize="14" Glyph="&#xE724;" />
+                    </Button>
+                </Grid>
+
+                <ScrollViewer Grid.Row="9" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedTaskJournal, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TaskJournalEntryView">
+                                <Border
+                                    Margin="0,4,0,4"
+                                    Padding="10"
+                                    Background="#2B3038"
+                                    CornerRadius="6">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border
+                                            Width="18"
+                                            Height="18"
+                                            Background="#2F8A56"
+                                            CornerRadius="9"
+                                            Visibility="{x:Bind IsTimesheetTransferred, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <FontIcon FontSize="10" Foreground="#FFFFFF" Glyph="&#xE73E;" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="4">
+                                            <TextBlock FontSize="11" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind CreatedAtText}" />
+                                            <TextBlock Text="{x:Bind Content}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Click="DeleteJournal_Click" IsEnabled="{x:Bind IsEditable}">
+                                            <FontIcon FontSize="13" Glyph="&#xE74D;" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <!-- Task editor overlay -->
+        <Grid
+            x:Name="TaskEditorOverlay"
+            Grid.RowSpan="4"
+            Grid.ColumnSpan="2"
+            Background="#B0000000"
+            Visibility="Collapsed">
+            <Border
+                Width="820"
+                MaxHeight="820"
+                Padding="28"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#202020"
+                BorderBrush="#4B5563"
+                BorderThickness="1"
+                CornerRadius="8">
+                <Grid RowSpacing="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock
+                        x:Name="TaskEditorHeading"
+                        Style="{StaticResource SubtitleTextBlockStyle}"
+                        Text="Task" />
+
+                    <ScrollViewer
+                        Grid.Row="1"
+                        HorizontalScrollBarVisibility="Disabled"
+                        HorizontalScrollMode="Disabled"
+                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollMode="Auto">
+                        <StackPanel Spacing="14">
+                            <ComboBox
+                                x:Name="TaskProjectBox"
+                                Header="Project"
+                                DisplayMemberPath="DisplayText"
+                                HorizontalAlignment="Stretch"
+                                MaxDropDownHeight="340" />
+                            <TextBox
+                                x:Name="TaskTitleBox"
+                                AcceptsReturn="True"
+                                Header="Title"
+                                HorizontalAlignment="Stretch"
+                                MinHeight="72"
+                                PlaceholderText="Task title"
+                                TextWrapping="Wrap" />
+                            <TextBox
+                                x:Name="TaskDescriptionBox"
+                                AcceptsReturn="True"
+                                Header="Description"
+                                HorizontalAlignment="Stretch"
+                                MinHeight="190"
+                                TextWrapping="Wrap" />
+                            <Grid ColumnSpacing="12" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <ComboBox
+                                    x:Name="TaskWorkTypeBox"
+                                    Header="Work type"
+                                    HorizontalAlignment="Stretch" />
+                                <ComboBox
+                                    x:Name="TaskPriorityBox"
+                                    Grid.Column="1"
+                                    Header="Priority"
+                                    HorizontalAlignment="Stretch" />
+                                <StackPanel Grid.Row="1" Spacing="6">
+                                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Estimated pomodoros" />
+                                    <Border MinHeight="38" Padding="12,8" Background="#2B3038" CornerRadius="6">
+                                        <TextBlock
+                                            x:Name="TaskPomodoroSummaryText"
+                                            VerticalAlignment="Center"
+                                            Text="Calculated from calendar assignments"
+                                            TextWrapping="Wrap" />
+                                    </Border>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
+                                    <CalendarDatePicker
+                                        x:Name="TaskDueBox"
+                                        Header="Due date"
+                                        FirstDayOfWeek="Monday"
+                                        HorizontalAlignment="Stretch"
+                                        DateChanged="TaskDueBox_DateChanged"
+                                        PlaceholderText="No due date" />
+                                    <TextBlock
+                                        x:Name="TaskDueDayText"
+                                        Style="{StaticResource MutedTextBlockStyle}"
+                                        Text="No due date"
+                                        TextWrapping="WrapWholeWords" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Grid Grid.Row="2" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Stretch"
+                            Click="SaveTaskEditor_Click"
+                            Style="{StaticResource JtsAccentButtonStyle}">
+                            <TextBlock Text="Save" />
+                        </Button>
+                        <Button Grid.Column="1" HorizontalAlignment="Stretch" Click="CancelTaskEditor_Click">
+                            <TextBlock Text="Cancel" />
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

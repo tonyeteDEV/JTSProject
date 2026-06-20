@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "JTS.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "JTS.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JTS.Mobile.Pages.TasksPage"
+             Title="Tasks"
+             BackgroundColor="#111418">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="0">
+
+        <!-- Header -->
+        <VerticalStackLayout Grid.Row="0" Padding="16,14,16,0" Spacing="2">
+            <Label Text="Tasks" FontSize="24" FontAttributes="Bold" TextColor="White" />
+            <Label x:Name="StatusLabel" Text="" FontSize="13" TextColor="#AEB6C2" />
+        </VerticalStackLayout>
+
+        <!-- Column tab strip -->
+        <ScrollView Grid.Row="1" Orientation="Horizontal" HorizontalScrollBarVisibility="Never" Padding="12,10">
+            <HorizontalStackLayout x:Name="ColumnStrip" Spacing="8" />
+        </ScrollView>
+
+        <!-- Task list (RefreshView + CollectionView) -->
+        <RefreshView Grid.Row="2" x:Name="TasksRefresh" Refreshing="OnRefreshing" RefreshColor="#3B82F6">
+            <CollectionView x:Name="TaskList" Margin="16,0,16,0" ItemsUpdatingScrollMode="KeepScrollOffset">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Stroke="#2A3240" StrokeThickness="1" BackgroundColor="#1A2030"
+                                Padding="14,12" Margin="0,0,0,8">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="10" />
+                            </Border.StrokeShape>
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnTaskTapped" CommandParameter="{Binding .}" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="22,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="4">
+                                <!-- Priority icon -->
+                                <Label Grid.Column="0" Grid.RowSpan="2"
+                                       Text="{Binding PriorityIcon}"
+                                       TextColor="{Binding PriorityColor}"
+                                       FontSize="18" VerticalTextAlignment="Center"
+                                       HorizontalTextAlignment="Center" />
+                                <!-- Title -->
+                                <Label Grid.Column="1" Grid.Row="0"
+                                       Text="{Binding Title}"
+                                       TextColor="White" FontSize="15" FontAttributes="Bold"
+                                       LineBreakMode="TailTruncation" />
+                                <!-- Project name -->
+                                <Label Grid.Column="1" Grid.Row="1"
+                                       Text="{Binding ProjectName}"
+                                       TextColor="#6B7280" FontSize="12"
+                                       LineBreakMode="TailTruncation" />
+                                <!-- Due date -->
+                                <Label Grid.Column="2" Grid.Row="0"
+                                       Text="{Binding DueDateShort}"
+                                       TextColor="#4B5563" FontSize="11"
+                                       IsVisible="{Binding HasDueDate}"
+                                       VerticalTextAlignment="Start" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout Padding="0,40" HorizontalOptions="Center">
+                        <Label Text="No tasks in this column" TextColor="#4B5563" FontSize="14" HorizontalTextAlignment="Center" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+
+        <!-- New task button -->
+        <Button Grid.Row="3" Text="+ New task"
+                Clicked="OnNewTask"
+                BackgroundColor="#2563EB" TextColor="White"
+                CornerRadius="10" Margin="16,8,16,12"
+                HeightRequest="48" />
+
+    </Grid>
+</ContentPage>
