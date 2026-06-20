@@ -1,3 +1,4 @@
+using System.Text.Json;
 using JTS.Core;
 using JTS.Data.Entities;
 using Microsoft.PowerPlatform.Dataverse.Client;
@@ -31,6 +32,7 @@ public sealed class DataverseAppDataService
     private const string TaskEstimatedMinutes = "jts_estimatedminutes";
     private const string TaskDueDate = "jts_duedate";
     private const string TaskMobileVisible = "jts_mobilevisible";
+    private const string TaskChecklist = "jts_checklist";
 
     private const string CalendarTable = "jts_bloquecalendario";
     private const string CalendarTask = "jts_taskid";
@@ -692,7 +694,7 @@ public sealed class DataverseAppDataService
         var rows = await RetrieveAllAsync(service, new QueryExpression(TaskTable)
         {
             ColumnSet = new ColumnSet(TaskId, TaskTitle, TaskDescription, TaskPriorityCode, TaskScheduledStart, TaskScheduledEnd,
-                TaskRegarding, TaskProject, TaskWorkType, TaskAppStatus, TaskEstimatedMinutes, TaskDueDate, TaskMobileVisible),
+                TaskRegarding, TaskProject, TaskWorkType, TaskAppStatus, TaskEstimatedMinutes, TaskDueDate, TaskMobileVisible, TaskChecklist),
             Criteria = new FilterExpression(LogicalOperator.Or)
             {
                 Conditions =
@@ -732,6 +734,7 @@ public sealed class DataverseAppDataService
                 ScheduledEnd = row.GetAttributeValue<DateTime?>(TaskScheduledEnd) is DateTime scheduledEnd ? DisplayFormat.ToSpainTime(scheduledEnd) : null,
                 EstimatedPomodoros = Math.Max(0, (int)Math.Ceiling((row.GetAttributeValue<int?>(TaskEstimatedMinutes) ?? 0) / 30d))
             };
+            task.ChecklistItems = DeserializeChecklist(row.GetAttributeValue<string>(TaskChecklist), task.Id);
 
             tasks.Add(task);
         }
@@ -790,6 +793,58 @@ public sealed class DataverseAppDataService
         entity[TaskRegarding] = new EntityReference(ProjectTable, projectDataverseId);
         if (task.ScheduledStart is DateTime scheduledStart) entity[TaskScheduledStart] = DisplayFormat.SpainTimeToUtc(scheduledStart);
         if (task.ScheduledEnd is DateTime scheduledEnd) entity[TaskScheduledEnd] = DisplayFormat.SpainTimeToUtc(scheduledEnd);
+        entity[TaskChecklist] = SerializeChecklist(task.ChecklistItems);
+    }
+
+    private static readonly JsonSerializerOptions ChecklistJsonOptions = new() { WriteIndented = false };
+
+    private sealed record ChecklistItemDto(string t, bool d);
+
+    private static string? SerializeChecklist(IReadOnlyList<TaskChecklistItem>? items)
+    {
+        if (items is null || items.Count == 0) return null;
+        var dtos = items
+            .Where(i => !string.IsNullOrWhiteSpace(i.Title))
+            .Select(i => new ChecklistItemDto(i.Title.Trim(), i.IsCompleted))
+            .ToList();
+        return dtos.Count == 0 ? null : JsonSerializer.Serialize(dtos, ChecklistJsonOptions);
+    }
+
+    private static List<TaskChecklistItem> DeserializeChecklist(string? json, int taskItemId)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new();
+        try
+        {
+            var dtos = JsonSerializer.Deserialize<List<ChecklistItemDto>>(json);
+            if (dtos is null) return new();
+            return dtos
+                .Where(d => !string.IsNullOrWhiteSpace(d.t))
+                .Select((d, index) => new TaskChecklistItem
+                {
+                    Id = index + 1,
+                    TaskItemId = taskItemId,
+                    Title = d.t.Trim(),
+                    IsCompleted = d.d,
+                    SortOrder = index
+                })
+                .ToList();
+        }
+        catch (JsonException)
+        {
+            return new();
+        }
+    }
+
+    public async Task UpdateTaskChecklistAsync(Guid taskId, IReadOnlyList<TaskChecklistItem> items)
+    {
+        using var service = await CreateServiceClientAsync();
+        var entity = new Entity(TaskTable, taskId)
+        {
+            [TaskChecklist] = SerializeChecklist(items),
+            [TaskMobileVisible] = true
+        };
+        await Task.Run(() => service.Update(entity));
+        InvalidateSnapshot();
     }
 
     private async Task<ServiceClient> CreateServiceClientAsync()

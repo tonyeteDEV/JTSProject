@@ -51,6 +51,14 @@ public sealed class AppSettingsService
     public Task SetVoiceSpeakingRateAsync(double value) =>
         SetAsync("Voice.SpeakingRate", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
 
+    public Task<string?> GetRemindersEnabledAsync() => GetAsync("Reminders.Enabled", encrypted: false);
+    public Task SetRemindersEnabledAsync(bool value) => SetAsync("Reminders.Enabled", value ? "true" : "false", encrypted: false);
+    public Task<string?> GetRemindersLeadDaysAsync() => GetAsync("Reminders.LeadDays", encrypted: false);
+    public Task SetRemindersLeadDaysAsync(int value) =>
+        SetAsync("Reminders.LeadDays", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
+    public Task<string?> GetReminderLastNotifiedAsync() => GetAsync("Reminders.LastNotified", encrypted: false);
+    public Task SetReminderLastNotifiedAsync(string? value) => SetAsync("Reminders.LastNotified", value, encrypted: false);
+
     public Task<string?> GetAsync(string key, bool encrypted = false)
     {
         return Task.FromResult<string?>(ReadCredential(key));

@@ -156,6 +156,34 @@
 
                 <Border Style="{StaticResource PanelBorderStyle}">
                     <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Reminders" />
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox
+                                VerticalAlignment="Bottom"
+                                Content="Notify me about due and overdue tasks"
+                                IsChecked="{x:Bind ViewModel.RemindersEnabled, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Column="1"
+                                Header="Remind days before due"
+                                Minimum="0"
+                                Maximum="30"
+                                SmallChange="1"
+                                SpinButtonPlacementMode="Inline"
+                                Value="{x:Bind ViewModel.RemindersLeadDays, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock
+                            Style="{StaticResource MutedTextBlockStyle}"
+                            Text="Shows a Windows notification for tasks due today or overdue (and up to N days ahead). Each task notifies at most once per day."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Voice models" />
                         <TextBox
                             Header="Whisper model path"

@@ -640,7 +640,11 @@ public sealed partial class AssistantViewModel : ObservableObject
                 Priority = _previewDraft.Priority,
                 EstimatedPomodoros = _previewDraft.EstimatedPomodoros,
                 DueDate = _previewDraft.DueDate,
-                Status = TaskItemStatus.Todo
+                Status = TaskItemStatus.Todo,
+                ChecklistItems = _previewDraft.ChecklistItems
+                    .Where(text => !string.IsNullOrWhiteSpace(text))
+                    .Select((text, index) => new TaskChecklistItem { Title = text.Trim(), SortOrder = index })
+                    .ToList()
             };
 
             if (_previewProject.DataverseId is not Guid projectDataverseId)

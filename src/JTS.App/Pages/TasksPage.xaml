@@ -340,12 +340,6 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
@@ -375,7 +369,23 @@
                         TextWrapping="Wrap" />
                 </Border>
 
-                <Grid Grid.Row="3" ColumnSpacing="8">
+                <TabView
+                    Grid.Row="3"
+                    Margin="0,4,0,0"
+                    VerticalAlignment="Stretch"
+                    CanReorderTabs="False"
+                    IsAddTabButtonVisible="False">
+
+                    <TabViewItem Header="Time &amp; calendar" IsClosable="False">
+                        <Grid RowSpacing="10" Margin="0,12,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                <Grid ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -386,7 +396,7 @@
                         Style="{StaticResource MutedTextBlockStyle}"
                         Text="{x:Bind ViewModel.SelectedTaskTimeTotalText, Mode=OneWay}" />
                 </Grid>
-                <ListView Grid.Row="4" MaxHeight="124" ItemsSource="{x:Bind ViewModel.SelectedTaskTimeByDay, Mode=OneWay}">
+                <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.SelectedTaskTimeByDay, Mode=OneWay}">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="vm:TaskTimeByDayView">
                             <Grid Padding="0,4,0,4" ColumnSpacing="8">
@@ -420,8 +430,8 @@
                     </ListView.ItemTemplate>
                 </ListView>
 
-                <TextBlock Grid.Row="5" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Calendar assignments" />
-                <ListView Grid.Row="6" MaxHeight="124" ItemsSource="{x:Bind ViewModel.SelectedTaskCalendarBlocks, Mode=OneWay}">
+                <TextBlock Grid.Row="2" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Calendar assignments" />
+                <ListView Grid.Row="3" ItemsSource="{x:Bind ViewModel.SelectedTaskCalendarBlocks, Mode=OneWay}">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="vm:TaskCalendarBlockView">
                             <Grid Padding="0,4,0,4" ColumnSpacing="8">
@@ -437,9 +447,69 @@
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
+                        </Grid>
+                    </TabViewItem>
 
-                <TextBlock Grid.Row="7" Style="{StaticResource BodyStrongTextBlockStyle}" Text="What was done" />
-                <Grid Grid.Row="8" ColumnSpacing="6">
+                    <TabViewItem Header="Checklist &amp; notes" IsClosable="False">
+                        <Grid RowSpacing="10" Margin="0,12,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                <!-- Checklist -->
+                <Grid Grid.Row="0" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Checklist" />
+                    <TextBlock
+                        Grid.Column="1"
+                        Style="{StaticResource MutedTextBlockStyle}"
+                        Text="{x:Bind ViewModel.SelectedTaskChecklistProgress, Mode=OneWay}" />
+                </Grid>
+                <StackPanel Grid.Row="1" Spacing="6">
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Name="ChecklistBox"
+                            PlaceholderText="Add a checklist item..."
+                            KeyDown="ChecklistBox_KeyDown" />
+                        <Button Grid.Column="1" Click="AddChecklistItem_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                            <FontIcon FontSize="14" Glyph="&#xE710;" />
+                        </Button>
+                    </Grid>
+                    <ItemsControl MaxHeight="160" ItemsSource="{x:Bind ViewModel.SelectedTaskChecklist, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ChecklistItemView">
+                                <Grid Padding="0,3,0,3" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox
+                                        Content="{x:Bind Title}"
+                                        IsChecked="{x:Bind IsCompleted}"
+                                        Tag="{x:Bind Index}"
+                                        Click="ChecklistItem_Click" />
+                                    <Button Grid.Column="1" VerticalAlignment="Center" Tag="{x:Bind Index}" Click="DeleteChecklistItem_Click">
+                                        <FontIcon FontSize="13" Glyph="&#xE74D;" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Style="{StaticResource BodyStrongTextBlockStyle}" Text="What was done" />
+                <Grid Grid.Row="3" ColumnSpacing="6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -454,7 +524,7 @@
                     </Button>
                 </Grid>
 
-                <ScrollViewer Grid.Row="9" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedTaskJournal, Mode=OneWay}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:TaskJournalEntryView">
@@ -490,6 +560,9 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
+                        </Grid>
+                    </TabViewItem>
+                </TabView>
             </Grid>
         </Border>
 

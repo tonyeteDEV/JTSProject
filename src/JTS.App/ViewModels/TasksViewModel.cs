@@ -23,8 +23,10 @@ public partial class TasksViewModel : ObservableObject
     public ObservableCollection<TaskJournalEntryView> SelectedTaskJournal { get; } = new();
     public ObservableCollection<TaskTimeByDayView> SelectedTaskTimeByDay { get; } = new();
     public ObservableCollection<TaskCalendarBlockView> SelectedTaskCalendarBlocks { get; } = new();
+    public ObservableCollection<ChecklistItemView> SelectedTaskChecklist { get; } = new();
 
     [ObservableProperty] private TaskRowView? _selectedTask;
+    [ObservableProperty] private string _selectedTaskChecklistProgress = "0/0";
     [ObservableProperty] private string _selectedTaskTimeTotalText = "Total tracked: 0m";
     [ObservableProperty] private bool _selectedTaskHasTimesheetLinks;
     [ObservableProperty] private int _assignedCount;
@@ -129,9 +131,14 @@ public partial class TasksViewModel : ObservableObject
         SelectedTaskJournal.Clear();
         SelectedTaskTimeByDay.Clear();
         SelectedTaskCalendarBlocks.Clear();
+        SelectedTaskChecklist.Clear();
+        SelectedTaskChecklistProgress = "0/0";
         SelectedTaskTimeTotalText = "Total tracked: 0m";
         SelectedTaskHasTimesheetLinks = false;
         if (SelectedTask?.DataverseId is not Guid taskDataverseId) return;
+
+        if (_tasksById.TryGetValue(SelectedTask.Id, out var selectedTaskModel))
+            RebuildChecklistView(selectedTaskModel);
 
         var comments = await _data.LoadCommentsAsync(taskDataverseId);
         foreach (var comment in comments)
@@ -254,6 +261,61 @@ public partial class TasksViewModel : ObservableObject
         await LoadSelectedTaskDetailsAsync();
     }
 
+    public async Task AddChecklistItemAsync(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return;
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task) ||
+            task.DataverseId is not Guid taskDataverseId) return;
+
+        task.ChecklistItems.Add(new TaskChecklistItem
+        {
+            Title = title.Trim(),
+            IsCompleted = false,
+            SortOrder = task.ChecklistItems.Count
+        });
+        await PersistChecklistAsync(task, taskDataverseId);
+    }
+
+    public async Task ToggleChecklistItemAsync(int index, bool isCompleted)
+    {
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task) ||
+            task.DataverseId is not Guid taskDataverseId) return;
+        if (index < 0 || index >= task.ChecklistItems.Count) return;
+        if (task.ChecklistItems[index].IsCompleted == isCompleted) return;
+
+        task.ChecklistItems[index].IsCompleted = isCompleted;
+        task.ChecklistItems[index].CompletedAt = isCompleted ? DateTime.UtcNow : null;
+        await PersistChecklistAsync(task, taskDataverseId);
+    }
+
+    public async Task DeleteChecklistItemAsync(int index)
+    {
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task) ||
+            task.DataverseId is not Guid taskDataverseId) return;
+        if (index < 0 || index >= task.ChecklistItems.Count) return;
+
+        task.ChecklistItems.RemoveAt(index);
+        await PersistChecklistAsync(task, taskDataverseId);
+    }
+
+    private async Task PersistChecklistAsync(TaskItem task, Guid taskDataverseId)
+    {
+        await _data.UpdateTaskChecklistAsync(taskDataverseId, task.ChecklistItems);
+        RebuildChecklistView(task);
+    }
+
+    private void RebuildChecklistView(TaskItem task)
+    {
+        SelectedTaskChecklist.Clear();
+        for (var i = 0; i < task.ChecklistItems.Count; i++)
+        {
+            var item = task.ChecklistItems[i];
+            SelectedTaskChecklist.Add(new ChecklistItemView(i, item.Title, item.IsCompleted));
+        }
+        var done = task.ChecklistItems.Count(i => i.IsCompleted);
+        SelectedTaskChecklistProgress = $"{done}/{task.ChecklistItems.Count}";
+    }
+
     public Task<TaskItem?> GetFullTaskAsync(int taskId)
     {
         if (!_tasksById.TryGetValue(taskId, out var task))
@@ -312,6 +374,8 @@ public sealed record TaskTimeByDayView(
 public sealed record TaskCalendarBlockView(string DateText, string TimeRange, string DurationText);
 
 public sealed record TaskJournalEntryView(Guid? DataverseId, string CreatedAtText, string Content, bool IsTimesheetTransferred, bool IsEditable);
+
+public sealed record ChecklistItemView(int Index, string Title, bool IsCompleted);
 
 public class TaskRowView
 {

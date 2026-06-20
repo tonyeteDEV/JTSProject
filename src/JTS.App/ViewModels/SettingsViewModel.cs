@@ -44,6 +44,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _status = string.Empty;
     [ObservableProperty] private bool _reviewTaskCommentsWithAi;
     [ObservableProperty] private bool _allowNaturalLanguageAgentActions;
+    [ObservableProperty] private bool _remindersEnabled = true;
+    [ObservableProperty] private double _remindersLeadDays;
     [ObservableProperty] private bool _isTestingPomodoroBell;
     [ObservableProperty] private bool _isDownloadingWhisperModel;
     [ObservableProperty] private bool _isDownloadingVoskModel;
@@ -93,6 +95,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         PomodoroLongBreakEvery = await GetDoubleSettingAsync("Pomodoro.LongBreakEvery", 4);
         ReviewTaskCommentsWithAi = string.Equals(await _settings.GetAsync("AI.ReviewTaskComments"), "true", StringComparison.OrdinalIgnoreCase);
         AllowNaturalLanguageAgentActions = string.Equals(await _settings.GetAsync("AI.AllowNaturalLanguageAgentActions"), "true", StringComparison.OrdinalIgnoreCase);
+        RemindersEnabled = !string.Equals(await _settings.GetRemindersEnabledAsync(), "false", StringComparison.OrdinalIgnoreCase);
+        RemindersLeadDays = await GetDoubleSettingAsync("Reminders.LeadDays", 0);
         var preloadColors = await _preload.GetConfiguredColorsAsync();
         PreloadLoadedColor = ParseColor(preloadColors.Loaded);
         PreloadLoadingColor = ParseColor(preloadColors.Loading);
@@ -119,6 +123,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         await _settings.SetAsync("Pomodoro.LongBreakEvery", ClampLongBreakEvery(PomodoroLongBreakEvery).ToString(System.Globalization.CultureInfo.InvariantCulture));
         await _settings.SetAsync("AI.ReviewTaskComments", ReviewTaskCommentsWithAi ? "true" : "false");
         await _settings.SetAsync("AI.AllowNaturalLanguageAgentActions", AllowNaturalLanguageAgentActions ? "true" : "false");
+        await _settings.SetRemindersEnabledAsync(RemindersEnabled);
+        await _settings.SetRemindersLeadDaysAsync((int)Math.Clamp(Math.Round(RemindersLeadDays), 0, 30));
         await _preload.SaveColorsAsync(
             ToHex(PreloadLoadedColor),
             ToHex(PreloadLoadingColor),

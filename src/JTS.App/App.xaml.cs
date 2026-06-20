@@ -69,6 +69,7 @@ public partial class App : Application
             var hotkey = Services.GetRequiredService<GlobalHotkeyService>();
             hotkey.QuickCaptureRequested += (_, _) => ShowQuickCapture();
             hotkey.Start();
+            Services.GetRequiredService<DueTaskReminderService>().Start();
         }
         catch
         {
@@ -120,6 +121,7 @@ public partial class App : Application
         services.AddSingleton<LocalVoiceAgentService>();
         services.AddSingleton<GlobalHotkeyService>();
         services.AddSingleton<NotificationService>();
+        services.AddSingleton<DueTaskReminderService>();
         services.AddSingleton<PomodoroAlarmService>();
         services.AddSingleton<PomodoroService>();
         services.AddTransient<CustomersViewModel>();

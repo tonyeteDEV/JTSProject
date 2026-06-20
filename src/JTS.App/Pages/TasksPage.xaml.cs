@@ -5,7 +5,9 @@ using JTS_App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.System;
 
 namespace JTS_App.Pages;
 
@@ -228,6 +230,36 @@ public sealed partial class TasksPage : Page, IRefreshablePage
         await ViewModel.AddJournalEntryAsync(row.Id, content);
         JournalBox.Text = string.Empty;
         await ViewModel.LoadJournalAsync();
+    }
+
+    private async void AddChecklistItem_Click(object sender, RoutedEventArgs e) => await AddChecklistItemFromBoxAsync();
+
+    private async void ChecklistBox_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Enter) return;
+        e.Handled = true;
+        await AddChecklistItemFromBoxAsync();
+    }
+
+    private async Task AddChecklistItemFromBoxAsync()
+    {
+        if (ViewModel.SelectedTask is null) return;
+        var text = ChecklistBox.Text;
+        if (string.IsNullOrWhiteSpace(text)) return;
+        await ViewModel.AddChecklistItemAsync(text);
+        ChecklistBox.Text = string.Empty;
+    }
+
+    private async void ChecklistItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not CheckBox { Tag: int index } box) return;
+        await ViewModel.ToggleChecklistItemAsync(index, box.IsChecked == true);
+    }
+
+    private async void DeleteChecklistItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not int index) return;
+        await ViewModel.DeleteChecklistItemAsync(index);
     }
 
     private async void EditTimeEntry_Click(object sender, RoutedEventArgs e)
