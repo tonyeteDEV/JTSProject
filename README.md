@@ -1,4 +1,4 @@
-# JTS
+# JTS Project
 
 Personal productivity desktop app for Windows. Plan customers, projects and tasks, run
 focus sessions, capture work by voice, and chat with an AI agent over your own data —
