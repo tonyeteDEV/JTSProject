@@ -27,9 +27,21 @@ public partial class CustomersViewModel : ObservableObject
 
     public async Task LoadAsync(bool forceSync = false)
     {
-        await _data.LoadTaskSnapshotAsync(forceSync);
+        var snapshot = await _data.LoadTaskSnapshotAsync(forceSync);
         Customers.Clear();
-        Status = "Customers are loaded through project references in Dataverse.";
+        foreach (var customer in snapshot.Projects
+            .Select(p => p.Customer)
+            .Where(c => c is not null && !string.IsNullOrWhiteSpace(c!.Name))
+            .GroupBy(c => c!.DataverseId)
+            .Select(g => g.First()!)
+            .OrderBy(c => c.Name))
+        {
+            Customers.Add(customer);
+        }
+
+        Status = Customers.Count == 0
+            ? "No customers found. Link customers to projects in Dataverse."
+            : $"{Customers.Count} customer(s) from Dataverse.";
     }
 
     public async Task<Customer> AddAsync(string name, string? contactInfo, string? notes)

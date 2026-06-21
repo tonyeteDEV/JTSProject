@@ -11,5 +11,10 @@ public partial class ProjectTreeNode : ObservableObject
 
     public ObservableCollection<ProjectTreeNode> Children { get; } = new();
 
+    [ObservableProperty]
+    private string _totalTrackedText = "0m";
+
     public string DisplayName => Project.Name;
+    public string Description => Project.Description ?? string.Empty;
+    public bool HasDescription => !string.IsNullOrWhiteSpace(Project.Description);
 }

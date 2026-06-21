@@ -65,6 +65,16 @@ public partial class ProjectsViewModel : ObservableObject
                 RootNodes.Add(node);
         }
 
+        var minutesByProject = new Dictionary<int, int>();
+        foreach (var task in tasks.Where(t => t.DataverseId is not null))
+        {
+            var entries = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value);
+            minutesByProject[task.ProjectId] = minutesByProject.GetValueOrDefault(task.ProjectId)
+                + entries.Sum(e => Math.Max(0, e.ActualMinutes));
+        }
+        foreach (var (projectId, node) in nodeById)
+            node.TotalTrackedText = FormatMinutes(minutesByProject.GetValueOrDefault(projectId));
+
         SelectedNode = selectedProjectId is int id && nodeById.TryGetValue(id, out var selected)
             ? selected
             : RootNodes.Count == 1 ? RootNodes[0] : null;
