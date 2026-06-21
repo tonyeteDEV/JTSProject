@@ -14,6 +14,7 @@ public partial class App : Application
     private Window? _window;
 
     public static IServiceProvider Services { get; private set; } = null!;
+    public static Window? MainWindow { get; private set; }
 
     public App()
     {
@@ -46,6 +47,7 @@ public partial class App : Application
             await Services.GetRequiredService<AppAppearanceService>().LoadAsync();
             Log("Appearance loaded");
             _window = new MainWindow();
+            MainWindow = _window;
             Log("MainWindow created");
             _window.Activate();
             Log("MainWindow activated");

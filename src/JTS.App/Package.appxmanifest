@@ -11,7 +11,7 @@
   <Identity
     Name="D11CE11F-59EC-4D57-BFFD-B6FA45B60CC7"
     Publisher="CN=AppPublisher"
-    Version="1.0.35.0" />
+    Version="1.0.37.0" />
 
   <mp:PhoneIdentity PhoneProductId="D11CE11F-59EC-4D57-BFFD-B6FA45B60CC7" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -53,4 +53,6 @@
     <DeviceCapability Name="microphone" />
   </Capabilities>
 </Package>
+
+
 

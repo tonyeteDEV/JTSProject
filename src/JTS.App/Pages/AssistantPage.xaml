@@ -99,18 +99,30 @@
                 </Grid>
                 <Grid Grid.Row="2" ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
+                    <Button
+                        VerticalAlignment="Bottom"
+                        Click="ImportCsv_Click"
+                        IsEnabled="{x:Bind ViewModel.IsImportingCsv, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"
+                        ToolTipService.ToolTip="Import a CSV of tasks; the agent interprets it and previews the tasks to create.">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="14" Glyph="&#xE8E5;" />
+                            <TextBlock Text="Import CSV" />
+                        </StackPanel>
+                    </Button>
                     <TextBox
                         x:Name="PromptBox"
+                        Grid.Column="1"
                         AcceptsReturn="True"
                         KeyDown="Prompt_KeyDown"
                         KeyUp="Prompt_KeyUp"
                         PlaceholderText="Ask naturally. I will prepare a preview before changing Dataverse."
                         Text="{x:Bind ViewModel.Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                         TextWrapping="Wrap" />
-                    <Button Grid.Column="1" Click="Send_Click" Style="{StaticResource JtsAccentButtonStyle}" VerticalAlignment="Bottom">
+                    <Button Grid.Column="2" Click="Send_Click" Style="{StaticResource JtsAccentButtonStyle}" VerticalAlignment="Bottom">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <FontIcon FontSize="14" Glyph="&#xE724;" />
                             <TextBlock Text="Send" />
@@ -118,6 +130,101 @@
                     </Button>
                 </Grid>
             </Grid>
+            </Border>
+        </Grid>
+
+        <!-- CSV import preview overlay -->
+        <Grid
+            Grid.RowSpan="2"
+            Background="#B0000000"
+            Visibility="{x:Bind ViewModel.IsCsvPreviewVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border
+                Width="760"
+                MaxHeight="780"
+                Padding="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="#202830"
+                BorderBrush="#3A414C"
+                BorderThickness="1"
+                CornerRadius="10">
+                <Grid RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.CsvPreviewHeading, Mode=OneWay}" />
+                        <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind ViewModel.CsvPreviewStatus, Mode=OneWay}" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <ProgressRing
+                        Grid.Row="1"
+                        Width="28"
+                        Height="28"
+                        HorizontalAlignment="Left"
+                        IsActive="{x:Bind ViewModel.IsImportingCsv, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.IsImportingCsv, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.CsvPreviewTasks, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CsvTaskPreviewItem">
+                                    <Border Margin="0,0,0,10" Padding="14" Background="#2B3038" CornerRadius="8">
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="{x:Bind Title}" TextWrapping="Wrap" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Border Padding="7,2" Background="#1F6FEB" CornerRadius="4">
+                                                        <TextBlock FontSize="12" Foreground="#FFFFFF" Text="{x:Bind ProjectName}" />
+                                                    </Border>
+                                                    <TextBlock VerticalAlignment="Center" Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind Meta}" />
+                                                </StackPanel>
+                                                <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind Description}" TextWrapping="Wrap" />
+                                                <TextBlock
+                                                    FontSize="12"
+                                                    Foreground="#AEE6C8"
+                                                    Text="{x:Bind ChecklistSummary}"
+                                                    TextWrapping="Wrap"
+                                                    Visibility="{x:Bind HasChecklist, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" VerticalAlignment="Top" Click="RemoveCsvTask_Click" ToolTipService.ToolTip="Remove from import">
+                                                <FontIcon FontSize="13" Glyph="&#xE74D;" />
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <Grid Grid.Row="3" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Click="CancelCsv_Click">
+                            <TextBlock Text="Cancel" />
+                        </Button>
+                        <Button
+                            Grid.Column="1"
+                            Click="CreateCsvTasks_Click"
+                            IsEnabled="{x:Bind ViewModel.IsImportingCsv, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"
+                            Style="{StaticResource JtsAccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="14" Glyph="&#xE73E;" />
+                                <TextBlock Text="Create all" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

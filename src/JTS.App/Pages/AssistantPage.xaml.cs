@@ -6,6 +6,8 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using Windows.System;
 using Windows.UI.Core;
 
@@ -29,6 +31,34 @@ public sealed partial class AssistantPage : Page, IRefreshablePage
     }
 
     private async void Send_Click(object sender, RoutedEventArgs e) => await ViewModel.SendAsync();
+
+    private async void ImportCsv_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker();
+        picker.FileTypeFilter.Add(".csv");
+        picker.FileTypeFilter.Add(".txt");
+        if (App.MainWindow is { } window)
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+        }
+
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        var text = await FileIO.ReadTextAsync(file);
+        await ViewModel.ImportCsvAsync(text, file.Name);
+    }
+
+    private void RemoveCsvTask_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is CsvTaskPreviewItem item)
+            ViewModel.RemoveCsvTask(item);
+    }
+
+    private void CancelCsv_Click(object sender, RoutedEventArgs e) => ViewModel.CancelCsvPreview();
+
+    private async void CreateCsvTasks_Click(object sender, RoutedEventArgs e) => await ViewModel.CreateCsvTasksAsync();
 
     public async Task RefreshAsync() => await ViewModel.LoadAsync(forceSync: true);
 

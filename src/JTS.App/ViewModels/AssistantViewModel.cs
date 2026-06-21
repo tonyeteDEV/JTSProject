@@ -25,6 +25,7 @@ public sealed partial class AssistantViewModel : ObservableObject
     public ObservableCollection<ChatMessageView> Messages { get; } = new();
     public ObservableCollection<Project> Projects { get; } = new();
     public ObservableCollection<string> PreviewChecklistItems { get; } = new();
+    public ObservableCollection<CsvTaskPreviewItem> CsvPreviewTasks { get; } = new();
     public ObservableCollection<string> DeepSeekModelOptions { get; } = new()
     {
         "deepseek-v4-flash",
@@ -54,6 +55,10 @@ public sealed partial class AssistantViewModel : ObservableObject
     [ObservableProperty] private string _previewPriority = string.Empty;
     [ObservableProperty] private string _previewEstimate = string.Empty;
     [ObservableProperty] private string _previewDueDate = string.Empty;
+    [ObservableProperty] private bool _isCsvPreviewVisible;
+    [ObservableProperty] private bool _isImportingCsv;
+    [ObservableProperty] private string _csvPreviewHeading = "Tasks to create";
+    [ObservableProperty] private string _csvPreviewStatus = string.Empty;
     [ObservableProperty] private bool _hasAgentActionPreview;
     [ObservableProperty] private string _agentActionTitle = string.Empty;
     [ObservableProperty] private string _agentActionDescription = string.Empty;
@@ -1733,9 +1738,236 @@ public sealed partial class AssistantViewModel : ObservableObject
         HasTaskPreview = false;
     }
 
+    public async Task ImportCsvAsync(string csvText, string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(csvText))
+        {
+            Messages.Add(new ChatMessageView("Assistant", "That CSV file looks empty."));
+            return;
+        }
+        if (Projects.Count == 0)
+        {
+            Messages.Add(new ChatMessageView("Assistant", "Create a project first, then import the CSV."));
+            return;
+        }
+        var apiKey = await _settings.GetDeepSeekApiKeyAsync();
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            Messages.Add(new ChatMessageView("Assistant", "Add your DeepSeek API key in Settings to import a CSV."));
+            return;
+        }
+
+        IsImportingCsv = true;
+        IsCsvPreviewVisible = true;
+        CsvPreviewTasks.Clear();
+        CsvPreviewHeading = $"Reading \"{fileName}\"...";
+        CsvPreviewStatus = "The agent is interpreting the file...";
+        try
+        {
+            var drafts = await ParseCsvTaskDraftsAsync(apiKey, PrepareCsvForAi(csvText));
+            if (drafts.Count == 0)
+            {
+                CsvPreviewHeading = "No tasks found";
+                CsvPreviewStatus = "I couldn't read any tasks from that file.";
+                return;
+            }
+
+            var fallback = SelectedVoiceProject ?? Projects.First();
+            foreach (var draft in drafts)
+                CsvPreviewTasks.Add(CsvTaskPreviewItem.FromDraft(draft, ResolveProject(draft.ProjectHint, fallback)));
+
+            CsvPreviewHeading = $"Review {CsvPreviewTasks.Count} task(s) to create";
+            CsvPreviewStatus = $"From \"{fileName}\". Remove any you don't want, then create them.";
+        }
+        catch (Exception ex)
+        {
+            CsvPreviewHeading = "Import failed";
+            CsvPreviewStatus = $"Could not interpret the CSV: {ex.Message}";
+        }
+        finally
+        {
+            IsImportingCsv = false;
+        }
+    }
+
+    private async Task<List<TaskDraft>> ParseCsvTaskDraftsAsync(string apiKey, string csvText)
+    {
+        var snapshot = await _data.LoadTaskSnapshotAsync(false);
+        var exampleTitles = snapshot.Tasks
+            .Where(t => t.Status != TaskItemStatus.Cancelled && !string.IsNullOrWhiteSpace(t.Title))
+            .Select(t => t.Title)
+            .Take(15)
+            .ToList();
+        var examples = exampleTitles.Count == 0 ? "(no examples yet)" : string.Join(" | ", exampleTitles);
+        var projectList = string.Join("\n", Projects.Select(p =>
+            string.IsNullOrWhiteSpace(p.Customer?.Name) ? $"- {p.Name}" : $"- {p.Name} (client: {p.Customer.Name})"));
+
+        var systemPrompt =
+            "You convert an arbitrary CSV of work items into JTS tasks. The CSV columns, headers, separators and language may vary every time — infer what each column means from its header and values (title/summary, description/details, project/client, priority, due date, work type, status, checklist/sub-steps, estimate). " +
+            "Create one task per meaningful data row; ignore header rows, totals and empty rows. " +
+            "Return ONLY a JSON array. Each element: {\"title\":\"...\",\"description\":\"...\",\"projectHint\":\"...\",\"workType\":\"DeepWork|Admin|Meeting|Learning|Communication|Planning|Other\",\"priority\":\"Low|Medium|High|Critical\",\"estimatedPomodoros\":1,\"dueDate\":\"yyyy-MM-dd or null\",\"checklistItems\":[\"...\"]}. " +
+            "Write concise, action-oriented titles consistent in style with these existing task titles: " + examples + ". " +
+            "For projectHint, choose the SINGLE best match from this allowed project list (return its EXACT name) based on the row's context/client, or null if genuinely unclear:\n" + projectList + "\n" +
+            "If a row implies sub-steps, acceptance criteria, or a small checklist, put those in checklistItems. Fill every field you can reasonably infer; use null or empty when unknown. Do not invent information that is not implied by the row.";
+
+        var response = await _deepSeek.ChatAsync(apiKey, new[]
+        {
+            new DeepSeekMessage("system", systemPrompt),
+            new DeepSeekMessage("user", "CSV file content:\n\n" + csvText)
+        }, GetDeepSeekOptions());
+
+        var json = ExtractJsonArray(response);
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        List<TaskDraftDto>? dtos;
+        if (json.TrimStart().StartsWith("[", StringComparison.Ordinal))
+        {
+            dtos = JsonSerializer.Deserialize<List<TaskDraftDto>>(json, options);
+        }
+        else
+        {
+            var single = JsonSerializer.Deserialize<TaskDraftDto>(json, options);
+            dtos = single is null ? new List<TaskDraftDto>() : new List<TaskDraftDto> { single };
+        }
+
+        return (dtos ?? new List<TaskDraftDto>())
+            .Where(d => !string.IsNullOrWhiteSpace(d.Title))
+            .Select(TaskDraft.FromDto)
+            .ToList();
+    }
+
+    private static string PrepareCsvForAi(string csv)
+    {
+        // CSV fields can contain large HTML blobs (e.g. Azure DevOps exports). Strip tags and
+        // decode entities to cut tokens and noise, while keeping row structure (newlines/commas).
+        var stripped = Regex.Replace(csv, "<[^>]+>", " ");
+        stripped = System.Net.WebUtility.HtmlDecode(stripped);
+        stripped = Regex.Replace(stripped, "[ \t]{2,}", " ");
+        return stripped.Length > 40000 ? stripped[..40000] : stripped;
+    }
+
+    private static string ExtractJsonArray(string text)
+    {
+        var start = text.IndexOf('[');
+        var end = text.LastIndexOf(']');
+        if (start >= 0 && end > start) return text[start..(end + 1)];
+
+        var objectStart = text.IndexOf('{');
+        var objectEnd = text.LastIndexOf('}');
+        return objectStart >= 0 && objectEnd > objectStart ? text[objectStart..(objectEnd + 1)] : text;
+    }
+
+    private Project ResolveProject(string? hint, Project fallback)
+    {
+        if (string.IsNullOrWhiteSpace(hint)) return fallback;
+        return Projects.FirstOrDefault(p => string.Equals(p.Name, hint, StringComparison.OrdinalIgnoreCase))
+            ?? Projects.FirstOrDefault(p => p.Name.Contains(hint, StringComparison.OrdinalIgnoreCase))
+            ?? Projects.FirstOrDefault(p => hint.Contains(p.Name, StringComparison.OrdinalIgnoreCase))
+            ?? fallback;
+    }
+
+    public void RemoveCsvTask(CsvTaskPreviewItem item)
+    {
+        CsvPreviewTasks.Remove(item);
+        if (CsvPreviewTasks.Count == 0)
+        {
+            IsCsvPreviewVisible = false;
+            return;
+        }
+        CsvPreviewHeading = $"Review {CsvPreviewTasks.Count} task(s) to create";
+    }
+
+    public void CancelCsvPreview()
+    {
+        CsvPreviewTasks.Clear();
+        IsCsvPreviewVisible = false;
+        CsvPreviewStatus = string.Empty;
+    }
+
+    public async Task<int> CreateCsvTasksAsync()
+    {
+        if (CsvPreviewTasks.Count == 0) return 0;
+
+        IsImportingCsv = true;
+        CsvPreviewStatus = "Creating tasks in Dataverse...";
+        var created = 0;
+        try
+        {
+            foreach (var item in CsvPreviewTasks.ToList())
+            {
+                if (item.Project.DataverseId is not Guid projectDataverseId) continue;
+                var task = new TaskItem
+                {
+                    ProjectId = item.Project.Id,
+                    Project = item.Project,
+                    Title = item.Draft.Title,
+                    Description = item.Draft.Description,
+                    WorkType = item.Draft.WorkType,
+                    Priority = item.Draft.Priority,
+                    EstimatedPomodoros = item.Draft.EstimatedPomodoros,
+                    DueDate = item.Draft.DueDate,
+                    Status = TaskItemStatus.Assigned,
+                    ChecklistItems = item.Draft.ChecklistItems
+                        .Where(text => !string.IsNullOrWhiteSpace(text))
+                        .Select((text, index) => new TaskChecklistItem { Title = text.Trim(), SortOrder = index })
+                        .ToList()
+                };
+                await _data.CreateTaskAsync(task, projectDataverseId);
+                created++;
+            }
+        }
+        finally
+        {
+            IsImportingCsv = false;
+        }
+
+        CsvPreviewTasks.Clear();
+        IsCsvPreviewVisible = false;
+        Messages.Add(new ChatMessageView("Assistant", $"Created {created} task(s) from the CSV."));
+        await LoadAsync();
+        return created;
+    }
+
     private async Task SaveConversationMessageAsync(string role, string content)
     {
         await Task.CompletedTask;
+    }
+}
+
+public sealed class CsvTaskPreviewItem
+{
+    public required string Title { get; init; }
+    public required string ProjectName { get; init; }
+    public required string Description { get; init; }
+    public required string Meta { get; init; }
+    public required IReadOnlyList<string> ChecklistItems { get; init; }
+    public string ChecklistSummary { get; init; } = string.Empty;
+    public bool HasChecklist => ChecklistItems.Count > 0;
+    internal TaskDraft Draft { get; init; } = null!;
+    internal Project Project { get; init; } = null!;
+
+    public static CsvTaskPreviewItem FromDraft(TaskDraft draft, Project project)
+    {
+        var meta = new List<string>
+        {
+            $"Priority: {draft.Priority}",
+            $"Type: {draft.WorkType}",
+            $"Est: {draft.EstimatedPomodoros} pomo",
+            draft.DueDate is DateTime due ? $"Due: {DisplayFormat.Date(due)}" : "No due date"
+        };
+
+        return new CsvTaskPreviewItem
+        {
+            Title = draft.Title,
+            ProjectName = project.Name,
+            Description = string.IsNullOrWhiteSpace(draft.Description) ? "No description" : draft.Description!,
+            Meta = string.Join("   ·   ", meta),
+            ChecklistItems = draft.ChecklistItems,
+            ChecklistSummary = draft.ChecklistItems.Count == 0
+                ? string.Empty
+                : "• " + string.Join("\n• ", draft.ChecklistItems),
+            Draft = draft,
+            Project = project
+        };
     }
 }
 
