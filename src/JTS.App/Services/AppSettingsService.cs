@@ -51,6 +51,24 @@ public sealed class AppSettingsService
     public Task SetVoiceSpeakingRateAsync(double value) =>
         SetAsync("Voice.SpeakingRate", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
 
+    public Task<string?> GetVideoAnalysisModeAsync() => GetAsync("Video.AnalysisMode", encrypted: false);
+    public Task SetVideoAnalysisModeAsync(string? value) => SetAsync("Video.AnalysisMode", value, encrypted: false);
+    public Task<string?> GetVideoVisualEndpointAsync() => GetAsync("Video.VisualEndpoint", encrypted: false);
+    public Task SetVideoVisualEndpointAsync(string? value) => SetAsync("Video.VisualEndpoint", value, encrypted: false);
+    public Task<string?> GetVideoVisualModelAsync() => GetAsync("Video.VisualModel", encrypted: false);
+    public Task SetVideoVisualModelAsync(string? value) => SetAsync("Video.VisualModel", value, encrypted: false);
+    public Task<string?> GetVideoVisualApiKeyAsync() => GetAsync("Video.VisualApiKey", encrypted: true);
+    public Task SetVideoVisualApiKeyAsync(string? value) => SetAsync("Video.VisualApiKey", value, encrypted: true);
+    public Task<string?> GetVideoVisualMaxFramesAsync() => GetAsync("Video.VisualMaxFrames", encrypted: false);
+    public Task SetVideoVisualMaxFramesAsync(int value) =>
+        SetAsync("Video.VisualMaxFrames", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
+    public Task<string?> GetVideoVisualFrameIntervalSecondsAsync() => GetAsync("Video.VisualFrameIntervalSeconds", encrypted: false);
+    public Task SetVideoVisualFrameIntervalSecondsAsync(int value) =>
+        SetAsync("Video.VisualFrameIntervalSeconds", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
+    public Task<string?> GetVideoVisualScanFpsAsync() => GetAsync("Video.VisualScanFps", encrypted: false);
+    public Task SetVideoVisualScanFpsAsync(double value) =>
+        SetAsync("Video.VisualScanFps", value.ToString(System.Globalization.CultureInfo.InvariantCulture), encrypted: false);
+
     public Task<string?> GetRemindersEnabledAsync() => GetAsync("Reminders.Enabled", encrypted: false);
     public Task SetRemindersEnabledAsync(bool value) => SetAsync("Reminders.Enabled", value ? "true" : "false", encrypted: false);
     public Task<string?> GetRemindersLeadDaysAsync() => GetAsync("Reminders.LeadDays", encrypted: false);

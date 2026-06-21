@@ -145,6 +145,8 @@ public partial class App : Application
         services.AddSingleton<DataverseAppDataService>();
         services.AddSingleton<DataversePreloadService>();
         services.AddSingleton<DataverseTimesheetService>();
+        services.AddSingleton<DataverseVideoAnalysisService>();
+        services.AddSingleton<VideoProcessingService>();
         services.AddSingleton<AppAppearanceService>();
         services.AddSingleton<AppDataContextService>();
         services.AddSingleton<AudioCaptureService>();
@@ -163,6 +165,7 @@ public partial class App : Application
         services.AddTransient<WeeklyPlannerViewModel>();
         services.AddSingleton<FocusViewModel>();
         services.AddTransient<StreakViewModel>();
+        services.AddTransient<VideoAnalysisViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddSingleton<AssistantViewModel>();
 

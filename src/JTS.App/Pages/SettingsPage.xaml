@@ -156,6 +156,71 @@
 
                 <Border Style="{StaticResource PanelBorderStyle}">
                     <StackPanel Spacing="12">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Video analysis" />
+                        <Grid x:Name="VideoAnalysisGrid" ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <ComboBox
+                                Header="Analysis mode"
+                                ItemsSource="{x:Bind ViewModel.VideoAnalysisModes, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.VideoAnalysisMode, Mode=TwoWay}" />
+                            <TextBox
+                                Grid.Column="1"
+                                Header="Visual AI endpoint"
+                                PlaceholderText="http://localhost:1234/v1/chat/completions"
+                                Text="{x:Bind ViewModel.VideoVisualEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBox
+                                Grid.Row="1"
+                                Header="Visual AI model"
+                                PlaceholderText="qwen2.5-vl-7b-instruct, llava, internvl..."
+                                Text="{x:Bind ViewModel.VideoVisualModel, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <PasswordBox
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Header="Visual AI API key (optional)"
+                                Password="{x:Bind ViewModel.VideoVisualApiKey, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Row="2"
+                                Header="Max visual frames"
+                                Minimum="1"
+                                Maximum="240"
+                                SmallChange="1"
+                                SpinButtonPlacementMode="Inline"
+                                Value="{x:Bind ViewModel.VideoVisualMaxFrames, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Row="2"
+                                Grid.Column="1"
+                                Header="Frame interval seconds"
+                                Minimum="1"
+                                Maximum="60"
+                                SmallChange="1"
+                                SpinButtonPlacementMode="Inline"
+                                Value="{x:Bind ViewModel.VideoVisualFrameIntervalSeconds, Mode=TwoWay}" />
+                            <NumberBox
+                                Grid.Row="3"
+                                Header="Deep scan FPS"
+                                Minimum="1"
+                                Maximum="30"
+                                SmallChange="1"
+                                SpinButtonPlacementMode="Inline"
+                                Value="{x:Bind ViewModel.VideoVisualScanFps, Mode=TwoWay}" />
+                        </Grid>
+                        <TextBlock
+                            Style="{StaticResource MutedTextBlockStyle}"
+                            Text="Deep mode scans the video locally at the configured FPS, selects the most relevant changed frames, and sends only those keyframes to an OpenAI-compatible vision endpoint."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource PanelBorderStyle}">
+                    <StackPanel Spacing="12">
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Reminders &amp; focus goal" />
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>

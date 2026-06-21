@@ -25,11 +25,19 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly HttpClient _httpClient = new();
 
     public IReadOnlyList<string> FontOptions => _appearance.FontOptions;
+    public IReadOnlyList<string> VideoAnalysisModes { get; } = ["Fast", "Deep"];
 
     [ObservableProperty] private string _deepSeekApiKey = string.Empty;
     [ObservableProperty] private string _openAIApiKey = string.Empty;
     [ObservableProperty] private string _whisperModelPath = string.Empty;
     [ObservableProperty] private string _voskModelPath = string.Empty;
+    [ObservableProperty] private string _videoAnalysisMode = "Fast";
+    [ObservableProperty] private string _videoVisualEndpoint = "http://localhost:1234/v1/chat/completions";
+    [ObservableProperty] private string _videoVisualModel = string.Empty;
+    [ObservableProperty] private string _videoVisualApiKey = string.Empty;
+    [ObservableProperty] private double _videoVisualMaxFrames = 18;
+    [ObservableProperty] private double _videoVisualFrameIntervalSeconds = 6;
+    [ObservableProperty] private double _videoVisualScanFps = 30;
     [ObservableProperty] private string _selectedFontFamily = "Segoe UI Variable Text";
     [ObservableProperty] private double _selectedFontSize = 13;
     [ObservableProperty] private string _d365TenantId = string.Empty;
@@ -84,6 +92,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         OpenAIApiKey = await _settings.GetOpenAIApiKeyAsync() ?? string.Empty;
         WhisperModelPath = await _settings.GetWhisperModelPathAsync() ?? string.Empty;
         VoskModelPath = await _settings.GetVoskModelPathAsync() ?? string.Empty;
+        VideoAnalysisMode = NormalizeVideoMode(await _settings.GetVideoAnalysisModeAsync());
+        VideoVisualEndpoint = await _settings.GetVideoVisualEndpointAsync() ?? "http://localhost:1234/v1/chat/completions";
+        VideoVisualModel = await _settings.GetVideoVisualModelAsync() ?? string.Empty;
+        VideoVisualApiKey = await _settings.GetVideoVisualApiKeyAsync() ?? string.Empty;
+        VideoVisualMaxFrames = await GetDoubleSettingAsync("Video.VisualMaxFrames", 18);
+        VideoVisualFrameIntervalSeconds = await GetDoubleSettingAsync("Video.VisualFrameIntervalSeconds", 6);
+        VideoVisualScanFps = await GetDoubleSettingAsync("Video.VisualScanFps", 30);
         SelectedFontFamily = _appearance.CurrentFontFamily;
         SelectedFontSize = _appearance.CurrentFontSize;
         D365TenantId = await _settings.GetD365TenantIdAsync() ?? string.Empty;
@@ -113,6 +128,13 @@ public sealed partial class SettingsViewModel : ObservableObject
         await _settings.SetOpenAIApiKeyAsync(OpenAIApiKey);
         await _settings.SetWhisperModelPathAsync(WhisperModelPath);
         await _settings.SetVoskModelPathAsync(VoskModelPath);
+        await _settings.SetVideoAnalysisModeAsync(NormalizeVideoMode(VideoAnalysisMode));
+        await _settings.SetVideoVisualEndpointAsync(VideoVisualEndpoint);
+        await _settings.SetVideoVisualModelAsync(VideoVisualModel);
+        await _settings.SetVideoVisualApiKeyAsync(VideoVisualApiKey);
+        await _settings.SetVideoVisualMaxFramesAsync((int)Math.Clamp(Math.Round(VideoVisualMaxFrames), 1, 240));
+        await _settings.SetVideoVisualFrameIntervalSecondsAsync((int)Math.Clamp(Math.Round(VideoVisualFrameIntervalSeconds), 1, 60));
+        await _settings.SetVideoVisualScanFpsAsync(Math.Clamp(VideoVisualScanFps, 1, 30));
         await _appearance.SaveFontFamilyAsync(SelectedFontFamily);
         await _appearance.SaveFontSizeAsync(SelectedFontSize);
         await _settings.SetD365TenantIdAsync(D365TenantId);
@@ -255,6 +277,9 @@ public sealed partial class SettingsViewModel : ObservableObject
             ? parsed
             : fallback;
     }
+
+    private static string NormalizeVideoMode(string? value) =>
+        string.Equals(value, "Deep", StringComparison.OrdinalIgnoreCase) ? "Deep" : "Fast";
 
     private void RefreshPomodoroPreview()
     {

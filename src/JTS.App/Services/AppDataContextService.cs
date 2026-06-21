@@ -7,10 +7,12 @@ namespace JTS_App.Services;
 public sealed class AppDataContextService
 {
     private readonly DataverseAppDataService _dataverseData;
+    private readonly DataverseVideoAnalysisService _videoAnalysis;
 
-    public AppDataContextService(DataverseAppDataService dataverseData)
+    public AppDataContextService(DataverseAppDataService dataverseData, DataverseVideoAnalysisService videoAnalysis)
     {
         _dataverseData = dataverseData;
+        _videoAnalysis = videoAnalysis;
     }
 
     public async Task<string> BuildAssistantContextAsync()
@@ -25,6 +27,7 @@ public sealed class AppDataContextService
         var since = DateTime.UtcNow.AddDays(-14);
         var recentTimeEntries = (await _dataverseData.LoadRecentTimeEntryContextAsync(since, 60)).ToList();
         var recentComments = (await _dataverseData.LoadRecentCommentContextAsync(since, 60)).ToList();
+        var recentVideoDocs = (await _videoAnalysis.LoadRecentDocumentationContextAsync(DateTime.UtcNow.AddDays(-60), 80)).ToList();
 
         var taskByDataverseId = tasks
             .Where(t => t.DataverseId is not null)
@@ -61,6 +64,17 @@ public sealed class AppDataContextService
             sb.AppendLine($"- commentId={item.Index} commentDataverseId={comment.Id} {comment.CreatedAt:u} taskId={task?.Id.ToString() ?? "unknown"} task={task?.Title ?? "?"} content={comment.Content}");
         }
 
+        sb.AppendLine("Recent video-generated documentation:");
+        foreach (var item in recentVideoDocs.Select((doc, index) => new { Doc = doc, Index = index + 1 }))
+        {
+            var doc = item.Doc;
+            var task = doc.TaskDataverseId is Guid taskDataverseId && taskByDataverseId.TryGetValue(taskDataverseId, out var mappedTask)
+                ? mappedTask
+                : null;
+            sb.AppendLine($"- videoDocId={item.Index} videoDocDataverseId={doc.Id} date={doc.CreatedAt:u} status={doc.StatusText} project={doc.ProjectName} taskId={task?.Id.ToString() ?? "unknown"} task={task?.Title ?? doc.TaskName} sourceVideo={doc.VideoAnalysisName}");
+            sb.AppendLine($"  documentation={Compact(doc.Markdown, 1200)}");
+        }
+
         return sb.ToString();
     }
 
@@ -77,6 +91,13 @@ public sealed class AppDataContextService
             .ThenBy(t => t.Priority)
             .Take(35)
             .ToList();
+        var taskDataverseIds = tasks
+            .Where(task => task.DataverseId is not null)
+            .Select(task => task.DataverseId!.Value)
+            .ToHashSet();
+        var videoDocs = (await _videoAnalysis.LoadRecentDocumentationContextAsync(DateTime.UtcNow.AddDays(-60), 25))
+            .Where(doc => doc.TaskDataverseId is Guid id && taskDataverseIds.Contains(id))
+            .ToList();
 
         var sb = new StringBuilder();
         sb.AppendLine("Compact app context for a spoken assistant turn.");
@@ -85,6 +106,21 @@ public sealed class AppDataContextService
         foreach (var t in tasks)
             sb.AppendLine($"- #{t.Id} {t.Title} project={t.Project?.Name ?? "?"} status={t.Status} due={t.DueDate:yyyy-MM-dd} scheduled={t.ScheduledStart:yyyy-MM-dd HH:mm}");
 
+        sb.AppendLine("Recent video documentation for these tasks:");
+        foreach (var doc in videoDocs)
+            sb.AppendLine($"- task={doc.TaskName} project={doc.ProjectName} date={doc.CreatedAt:u} summary={Compact(doc.Markdown, 500)}");
+
         return sb.ToString();
+    }
+
+    private static string Compact(string value, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "(empty)";
+        var compact = string.Join(
+            " ",
+            value.Split(['\r', '\n', '\t'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => part.Trim())
+                .Where(part => part.Length > 0));
+        return compact.Length <= maxChars ? compact : compact[..maxChars] + "...";
     }
 }

@@ -97,6 +97,11 @@
                         <FontIcon Glyph="&#xE7C1;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Video docs" Tag="video">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE714;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Customers" Tag="customers">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE716;" />

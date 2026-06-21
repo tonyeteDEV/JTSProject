@@ -51,6 +51,7 @@ public sealed partial class SettingsPage : Page, IRefreshablePage
         ConfigureGrid(AppearanceGrid, compact, 2);
         ConfigureGrid(PreloadColorsGrid, compact, 4);
         ConfigureGrid(AssistantOptionsGrid, compact, 2);
+        ConfigureGrid(VideoAnalysisGrid, compact, 7);
         ConfigureGrid(D365Grid, compact, 4);
 
         ConfigureButtonPanel(VoiceButtonsPanel, compact);
