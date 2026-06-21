@@ -73,12 +73,13 @@ public sealed partial class WeeklyPlannerViewModel : ObservableObject
             .OrderBy(b => b.Start)
             .ToList();
 
-        var actualFocusSecondsByTask = new Dictionary<int, int>();
-        foreach (var task in snapshot.Tasks.Where(t => t.DataverseId is not null))
-        {
-            var entries = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value, forceSync);
-            actualFocusSecondsByTask[task.Id] = entries.Sum(s => s.ActualMinutes) * 60;
-        }
+        var tasksWithDataverseId = snapshot.Tasks.Where(t => t.DataverseId is not null).ToList();
+        var entriesByTask = await _data.LoadTimeEntriesByTaskAsync(tasksWithDataverseId.Select(t => t.DataverseId!.Value), forceSync);
+        var actualFocusSecondsByTask = tasksWithDataverseId.ToDictionary(
+            task => task.Id,
+            task => entriesByTask.TryGetValue(task.DataverseId!.Value, out var entries)
+                ? entries.Sum(s => s.ActualMinutes) * 60
+                : 0);
 
         _taskById.Clear();
         _taskModelsById.Clear();

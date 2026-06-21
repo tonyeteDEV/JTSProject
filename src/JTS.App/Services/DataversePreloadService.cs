@@ -59,11 +59,11 @@ public sealed class DataversePreloadService
                 .ToList();
 
             Set("Comments", PreloadState.Loading);
-            await _data.PreloadCommentsAsync(dataverseTaskIds, forceSync);
-            Set("Comments", PreloadState.Loaded);
-
             Set("Time entries", PreloadState.Loading);
-            await _data.PreloadTimeEntriesAsync(dataverseTaskIds, forceSync);
+            var commentsTask = _data.PreloadCommentsAsync(dataverseTaskIds, forceSync);
+            var timeEntriesTask = _data.PreloadTimeEntriesAsync(dataverseTaskIds, forceSync);
+            await Task.WhenAll(commentsTask, timeEntriesTask);
+            Set("Comments", PreloadState.Loaded);
             Set("Time entries", PreloadState.Loaded);
         }
         catch (Exception ex)

@@ -625,7 +625,10 @@ public sealed partial class FocusViewModel : ObservableObject
         var task = ActiveTask ?? SelectedTask;
         if (task?.DataverseId is not Guid taskDataverseId) return;
 
-        var entries = await _data.LoadCommentsAsync(taskDataverseId);
+        var details = await _data.LoadTaskDetailsSnapshotAsync([taskDataverseId]);
+        var entries = details.CommentsByTask.TryGetValue(taskDataverseId, out var cachedComments)
+            ? cachedComments
+            : [];
         foreach (var entry in entries)
         {
             var isTransferred = entry.TimesheetLineDataverseId is not null;
@@ -638,8 +641,13 @@ public sealed partial class FocusViewModel : ObservableObject
                 !isTransferred));
         }
 
-        _activeTaskSavedSeconds = await _data.LoadTimeEntrySecondsTotalAsync(taskDataverseId);
-        SelectedTaskHasTimesheetLinks = await _data.HasTimesheetLockedTaskDataAsync(taskDataverseId);
+        var timeEntries = details.TimeEntriesByTask.TryGetValue(taskDataverseId, out var cachedTimeEntries)
+            ? cachedTimeEntries
+            : [];
+        _activeTaskSavedSeconds = timeEntries.Sum(entry => Math.Max(0, entry.ActualMinutes * 60));
+        SelectedTaskHasTimesheetLinks =
+            entries.Any(entry => entry.TimesheetLineDataverseId is not null) ||
+            timeEntries.Any(entry => entry.TimesheetLineDataverseId is not null);
         ActiveTaskLabel = ActiveTask?.DisplayName ?? SelectedTask?.DisplayName ?? "No active task";
         ActiveTaskTotalText = $"Task total: {FormatSeconds(_activeTaskSavedSeconds + ActiveTaskCurrentSeconds())}";
     }
@@ -676,12 +684,15 @@ public sealed partial class FocusViewModel : ObservableObject
     {
         var today = date.Date;
         var snapshot = await _data.LoadTaskSnapshotAsync(forceSync);
-        var allTaskSessions = new List<(TaskItem Task, PomodoroSession Session)>();
-        foreach (var task in snapshot.Tasks.Where(t => t.DataverseId is not null))
-        {
-            var sessions = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value, forceSync);
-            allTaskSessions.AddRange(sessions.Select(session => (task, session)));
-        }
+        var tasksWithDataverseId = snapshot.Tasks.Where(t => t.DataverseId is not null).ToList();
+        var entriesByTask = await _data.LoadTimeEntriesByTaskAsync(tasksWithDataverseId.Select(t => t.DataverseId!.Value), forceSync);
+        var allTaskSessions = tasksWithDataverseId
+            .SelectMany(task =>
+            {
+                var sessions = entriesByTask.TryGetValue(task.DataverseId!.Value, out var cached) ? cached : [];
+                return sessions.Select(session => (Task: task, Session: session));
+            })
+            .ToList();
 
         _workDates.Clear();
         foreach (var workDate in allTaskSessions.Select(s => DisplayFormat.ToSpainTime(s.Session.StartedAt).Date).Distinct())

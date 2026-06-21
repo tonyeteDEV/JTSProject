@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using JTS.Data;
 using JTS.Core;
 using JTS.Data.Entities;
 using Microsoft.PowerPlatform.Dataverse.Client;
@@ -11,6 +14,10 @@ namespace JTS_App.Services;
 
 public sealed class DataverseAppDataService
 {
+    private const int CacheVersion = 1;
+    private static readonly TimeSpan PersistentCacheTtl = TimeSpan.FromDays(7);
+    private static readonly JsonSerializerOptions PersistentCacheJsonOptions = new(JsonSerializerDefaults.Web);
+
     private const string ProjectTable = "jts_proyecto";
     private const string ProjectId = "jts_proyectoid";
     private const string ProjectName = "jts_proyecto";
@@ -71,6 +78,9 @@ public sealed class DataverseAppDataService
     private readonly Dictionary<Guid, IReadOnlyList<TaskJournalEntry>> _commentsByTask = new();
     private readonly Dictionary<Guid, IReadOnlyList<PomodoroSession>> _timeEntriesByTask = new();
     private DataverseTaskSnapshot? _cachedSnapshot;
+    private string? _cacheEnvironmentHash;
+    private string? _commentTimesheetLineLookup;
+    private string? _timeTimesheetLineLookup;
 
     public DataverseAppDataService(AppSettingsService settings)
     {
@@ -86,14 +96,21 @@ public sealed class DataverseAppDataService
         {
             if (!forceSync && _cachedSnapshot is not null) return _cachedSnapshot;
 
-        using var service = await CreateServiceClientAsync();
-        var projects = await LoadProjectsAsync(service);
-        var projectIdByDataverseId = projects
-            .Where(p => p.DataverseId is not null)
-            .ToDictionary(p => p.DataverseId!.Value, p => p.Id);
-        var tasks = await LoadTasksAsync(service, projects, projectIdByDataverseId);
-        await LoadCalendarBlocksAsync(service, tasks);
+            if (!forceSync && await ReadPersistentCacheAsync<DataverseTaskSnapshotCache>("snapshot") is { } snapshotCache)
+            {
+                _cachedSnapshot = FromCache(snapshotCache);
+                return _cachedSnapshot;
+            }
+
+            using var service = await CreateServiceClientAsync();
+            var projects = await LoadProjectsAsync(service);
+            var projectIdByDataverseId = projects
+                .Where(p => p.DataverseId is not null)
+                .ToDictionary(p => p.DataverseId!.Value, p => p.Id);
+            var tasks = await LoadTasksAsync(service, projects, projectIdByDataverseId);
+            await LoadCalendarBlocksAsync(service, tasks);
             _cachedSnapshot = new DataverseTaskSnapshot(projects, tasks);
+            await WritePersistentCacheAsync("snapshot", ToCache(_cachedSnapshot));
             return _cachedSnapshot;
         }
         finally
@@ -109,37 +126,24 @@ public sealed class DataverseAppDataService
             if (!forceSync && _commentsByTask.TryGetValue(taskId, out var cached)) return cached;
         }
 
-        using var service = await CreateServiceClientAsync();
-        var commentLineLookup = FindLookupAttribute(RetrieveMetadata(service, CommentTable), TimesheetLineTable)?.LogicalName;
-        var columns = new ColumnSet("jts_comentariotareaid", CommentContent, "createdon");
-        if (!string.IsNullOrWhiteSpace(commentLineLookup)) columns.AddColumn(commentLineLookup);
+        var byTask = await LoadCommentsByTaskAsync([taskId], forceSync);
+        return byTask.TryGetValue(taskId, out var comments) ? comments : [];
+    }
 
-        var rows = await RetrieveAllAsync(service, new QueryExpression(CommentTable)
-        {
-            ColumnSet = columns,
-            Criteria = new FilterExpression
-            {
-                Conditions = { new ConditionExpression(CommentTask, ConditionOperator.Equal, taskId) }
-            },
-            Orders = { new OrderExpression("createdon", OrderType.Descending) }
-        });
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<TaskJournalEntry>>> LoadCommentsByTaskAsync(IEnumerable<Guid> taskIds, bool forceSync = false)
+    {
+        var ids = taskIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, IReadOnlyList<TaskJournalEntry>>();
 
-        var result = rows.Select((row, index) => new TaskJournalEntry
-        {
-            Id = index + 1,
-            DataverseId = row.Id,
-            Content = row.GetAttributeValue<string>(CommentContent) ?? string.Empty,
-            CreatedAt = row.GetAttributeValue<DateTime?>("createdon") ?? DateTime.UtcNow,
-            TimesheetLineDataverseId = string.IsNullOrWhiteSpace(commentLineLookup)
-                ? null
-                : row.GetAttributeValue<EntityReference>(commentLineLookup)?.Id
-        }).ToList();
+        await PreloadCommentsAsync(ids, forceSync);
         lock (_detailCacheGate)
         {
-            _commentsByTask[taskId] = result;
+            return ids.ToDictionary(
+                id => id,
+                id => _commentsByTask.TryGetValue(id, out var comments)
+                    ? comments
+                    : (IReadOnlyList<TaskJournalEntry>)[]);
         }
-
-        return result;
     }
 
     public async Task<IReadOnlyList<PomodoroSession>> LoadTimeEntriesAsync(Guid taskId, bool forceSync = false)
@@ -149,47 +153,141 @@ public sealed class DataverseAppDataService
             if (!forceSync && _timeEntriesByTask.TryGetValue(taskId, out var cached)) return cached;
         }
 
-        using var service = await CreateServiceClientAsync();
-        var timeLineLookup = FindLookupAttribute(RetrieveMetadata(service, TimeTable), TimesheetLineTable)?.LogicalName;
-        var columns = new ColumnSet("jts_tiempotareaid", TimeStartedAt, TimeEndedAt, TimeActualSeconds, TimeWorkDate);
-        if (!string.IsNullOrWhiteSpace(timeLineLookup)) columns.AddColumn(timeLineLookup);
+        var byTask = await LoadTimeEntriesByTaskAsync([taskId], forceSync);
+        return byTask.TryGetValue(taskId, out var entries) ? entries : [];
+    }
 
-        var rows = await RetrieveAllAsync(service, new QueryExpression(TimeTable)
-        {
-            ColumnSet = columns,
-            Criteria = new FilterExpression
-            {
-                Conditions = { new ConditionExpression(TimeTask, ConditionOperator.Equal, taskId) }
-            }
-        });
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<PomodoroSession>>> LoadTimeEntriesByTaskAsync(IEnumerable<Guid> taskIds, bool forceSync = false)
+    {
+        var ids = taskIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<Guid, IReadOnlyList<PomodoroSession>>();
 
-        var result = rows.Select((row, index) =>
-        {
-            var startedAt = row.GetAttributeValue<DateTime?>(TimeStartedAt)
-                ?? row.GetAttributeValue<DateTime?>(TimeWorkDate)
-                ?? DateTime.UtcNow;
-            var actualSeconds = row.GetAttributeValue<int?>(TimeActualSeconds) ?? 0;
-            return new PomodoroSession
-            {
-                Id = index + 1,
-                DataverseId = row.Id,
-                StartedAt = startedAt,
-                EndedAt = row.GetAttributeValue<DateTime?>(TimeEndedAt),
-                ActualMinutes = Math.Max(1, (int)Math.Ceiling(actualSeconds / 60d)),
-                PlannedMinutes = Math.Max(1, (int)Math.Ceiling(actualSeconds / 60d)),
-                SessionType = PomodoroSessionType.Work,
-                Completed = true,
-                TimesheetLineDataverseId = string.IsNullOrWhiteSpace(timeLineLookup)
-                    ? null
-                : row.GetAttributeValue<EntityReference>(timeLineLookup)?.Id
-            };
-        }).ToList();
+        await PreloadTimeEntriesAsync(ids, forceSync);
         lock (_detailCacheGate)
         {
-            _timeEntriesByTask[taskId] = result;
+            return ids.ToDictionary(
+                id => id,
+                id => _timeEntriesByTask.TryGetValue(id, out var entries)
+                    ? entries
+                    : (IReadOnlyList<PomodoroSession>)[]);
+        }
+    }
+
+    public async Task<DataverseTaskDetailsSnapshot> LoadTaskDetailsSnapshotAsync(IEnumerable<Guid> taskIds, bool forceSync = false)
+    {
+        var ids = taskIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new DataverseTaskDetailsSnapshot(
+                new Dictionary<Guid, IReadOnlyList<TaskJournalEntry>>(),
+                new Dictionary<Guid, IReadOnlyList<PomodoroSession>>());
+
+        var commentsTask = LoadCommentsByTaskAsync(ids, forceSync);
+        var timeTask = LoadTimeEntriesByTaskAsync(ids, forceSync);
+        await Task.WhenAll(commentsTask, timeTask);
+        return new DataverseTaskDetailsSnapshot(await commentsTask, await timeTask);
+    }
+
+    public async Task<DataverseTaskDetailsSnapshot> LoadTaskDetailsForSpainDateAsync(IEnumerable<Guid> taskIds, DateTime spainDate)
+    {
+        var ids = taskIds.Distinct().ToList();
+        var emptyComments = ids.ToDictionary(id => id, _ => (IReadOnlyList<TaskJournalEntry>)[]);
+        var emptyTimeEntries = ids.ToDictionary(id => id, _ => (IReadOnlyList<PomodoroSession>)[]);
+        if (ids.Count == 0) return new DataverseTaskDetailsSnapshot(emptyComments, emptyTimeEntries);
+
+        using var service = await CreateServiceClientAsync();
+        var startUtc = DisplayFormat.SpainDayStartUtc(spainDate);
+        var endUtc = DisplayFormat.SpainDayStartUtc(spainDate.AddDays(1));
+
+        var commentLineLookup = GetCommentTimesheetLineLookup(service);
+        var commentColumns = new ColumnSet("jts_comentariotareaid", CommentTask, CommentContent, "createdon");
+        if (!string.IsNullOrWhiteSpace(commentLineLookup)) commentColumns.AddColumn(commentLineLookup);
+
+        var timeLineLookup = GetTimeTimesheetLineLookup(service);
+        var timeColumns = new ColumnSet("jts_tiempotareaid", TimeTask, TimeStartedAt, TimeEndedAt, TimeActualSeconds, TimeWorkDate);
+        if (!string.IsNullOrWhiteSpace(timeLineLookup)) timeColumns.AddColumn(timeLineLookup);
+
+        var commentRows = new List<Entity>();
+        var timeRows = new List<Entity>();
+        foreach (var chunk in ids.Chunk(200))
+        {
+            var chunkIds = chunk.Cast<object>().ToArray();
+            commentRows.AddRange(await RetrieveAllAsync(service, new QueryExpression(CommentTable)
+            {
+                ColumnSet = commentColumns,
+                Criteria = new FilterExpression
+                {
+                    Conditions =
+                    {
+                        new ConditionExpression(CommentTask, ConditionOperator.In, chunkIds),
+                        new ConditionExpression("createdon", ConditionOperator.OnOrAfter, startUtc),
+                        new ConditionExpression("createdon", ConditionOperator.LessThan, endUtc)
+                    }
+                },
+                Orders = { new OrderExpression("createdon", OrderType.Descending) }
+            }));
+
+            timeRows.AddRange(await RetrieveAllAsync(service, new QueryExpression(TimeTable)
+            {
+                ColumnSet = timeColumns,
+                Criteria = new FilterExpression
+                {
+                    Conditions =
+                    {
+                        new ConditionExpression(TimeTask, ConditionOperator.In, chunkIds),
+                        new ConditionExpression(TimeStartedAt, ConditionOperator.OnOrAfter, startUtc),
+                        new ConditionExpression(TimeStartedAt, ConditionOperator.LessThan, endUtc)
+                    }
+                }
+            }));
         }
 
-        return result;
+        var commentsByTask = commentRows
+            .Where(row => row.GetAttributeValue<EntityReference>(CommentTask)?.Id is not null)
+            .GroupBy(row => row.GetAttributeValue<EntityReference>(CommentTask)!.Id)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<TaskJournalEntry>)group.Select((row, index) => new TaskJournalEntry
+                {
+                    Id = index + 1,
+                    DataverseId = row.Id,
+                    Content = row.GetAttributeValue<string>(CommentContent) ?? string.Empty,
+                    CreatedAt = row.GetAttributeValue<DateTime?>("createdon") ?? DateTime.UtcNow,
+                    TimesheetLineDataverseId = string.IsNullOrWhiteSpace(commentLineLookup)
+                        ? null
+                        : row.GetAttributeValue<EntityReference>(commentLineLookup)?.Id
+                }).ToList());
+
+        var timeEntriesByTask = timeRows
+            .Where(row => row.GetAttributeValue<EntityReference>(TimeTask)?.Id is not null)
+            .GroupBy(row => row.GetAttributeValue<EntityReference>(TimeTask)!.Id)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<PomodoroSession>)group.Select((row, index) =>
+                {
+                    var startedAt = row.GetAttributeValue<DateTime?>(TimeStartedAt)
+                        ?? row.GetAttributeValue<DateTime?>(TimeWorkDate)
+                        ?? DateTime.UtcNow;
+                    var actualSeconds = row.GetAttributeValue<int?>(TimeActualSeconds) ?? 0;
+                    var actualMinutes = Math.Max(1, (int)Math.Ceiling(actualSeconds / 60d));
+                    return new PomodoroSession
+                    {
+                        Id = index + 1,
+                        DataverseId = row.Id,
+                        StartedAt = startedAt,
+                        EndedAt = row.GetAttributeValue<DateTime?>(TimeEndedAt),
+                        ActualMinutes = actualMinutes,
+                        PlannedMinutes = actualMinutes,
+                        SessionType = PomodoroSessionType.Work,
+                        Completed = true,
+                        TimesheetLineDataverseId = string.IsNullOrWhiteSpace(timeLineLookup)
+                            ? null
+                            : row.GetAttributeValue<EntityReference>(timeLineLookup)?.Id
+                    };
+                }).ToList());
+
+        return new DataverseTaskDetailsSnapshot(
+            ids.ToDictionary(id => id, id => commentsByTask.TryGetValue(id, out var comments) ? comments : emptyComments[id]),
+            ids.ToDictionary(id => id, id => timeEntriesByTask.TryGetValue(id, out var entries) ? entries : emptyTimeEntries[id]));
     }
 
     public async Task PreloadCommentsAsync(IEnumerable<Guid> taskIds, bool forceSync = false)
@@ -197,13 +295,30 @@ public sealed class DataverseAppDataService
         var ids = FilterIdsToLoad(taskIds, _commentsByTask, forceSync);
         if (ids.Count == 0) return;
 
+        var idsToLoad = new List<Guid>();
+        foreach (var id in ids)
+        {
+            if (!forceSync && await ReadPersistentCacheAsync<List<TaskJournalEntryCache>>($"comments-{id:N}") is { } cachedComments)
+            {
+                lock (_detailCacheGate)
+                {
+                    _commentsByTask[id] = FromCache(cachedComments);
+                }
+            }
+            else
+            {
+                idsToLoad.Add(id);
+            }
+        }
+        if (idsToLoad.Count == 0) return;
+
         using var service = await CreateServiceClientAsync();
-        var commentLineLookup = FindLookupAttribute(RetrieveMetadata(service, CommentTable), TimesheetLineTable)?.LogicalName;
+        var commentLineLookup = GetCommentTimesheetLineLookup(service);
         var columns = new ColumnSet("jts_comentariotareaid", CommentTask, CommentContent, "createdon");
         if (!string.IsNullOrWhiteSpace(commentLineLookup)) columns.AddColumn(commentLineLookup);
 
         var rows = new List<Entity>();
-        foreach (var chunk in ids.Chunk(200))
+        foreach (var chunk in idsToLoad.Chunk(200))
         {
             rows.AddRange(await RetrieveAllAsync(service, new QueryExpression(CommentTable)
             {
@@ -237,8 +352,18 @@ public sealed class DataverseAppDataService
 
         lock (_detailCacheGate)
         {
-            foreach (var id in ids)
+            foreach (var id in idsToLoad)
                 _commentsByTask[id] = grouped.TryGetValue(id, out var comments) ? comments : [];
+        }
+
+        foreach (var id in idsToLoad)
+        {
+            IReadOnlyList<TaskJournalEntry> comments;
+            lock (_detailCacheGate)
+            {
+                comments = _commentsByTask.TryGetValue(id, out var cached) ? cached : [];
+            }
+            await WritePersistentCacheAsync($"comments-{id:N}", ToCache(comments));
         }
     }
 
@@ -247,13 +372,30 @@ public sealed class DataverseAppDataService
         var ids = FilterIdsToLoad(taskIds, _timeEntriesByTask, forceSync);
         if (ids.Count == 0) return;
 
+        var idsToLoad = new List<Guid>();
+        foreach (var id in ids)
+        {
+            if (!forceSync && await ReadPersistentCacheAsync<List<PomodoroSessionCache>>($"time-{id:N}") is { } cachedEntries)
+            {
+                lock (_detailCacheGate)
+                {
+                    _timeEntriesByTask[id] = FromCache(cachedEntries);
+                }
+            }
+            else
+            {
+                idsToLoad.Add(id);
+            }
+        }
+        if (idsToLoad.Count == 0) return;
+
         using var service = await CreateServiceClientAsync();
-        var timeLineLookup = FindLookupAttribute(RetrieveMetadata(service, TimeTable), TimesheetLineTable)?.LogicalName;
+        var timeLineLookup = GetTimeTimesheetLineLookup(service);
         var columns = new ColumnSet("jts_tiempotareaid", TimeTask, TimeStartedAt, TimeEndedAt, TimeActualSeconds, TimeWorkDate);
         if (!string.IsNullOrWhiteSpace(timeLineLookup)) columns.AddColumn(timeLineLookup);
 
         var rows = new List<Entity>();
-        foreach (var chunk in ids.Chunk(200))
+        foreach (var chunk in idsToLoad.Chunk(200))
         {
             rows.AddRange(await RetrieveAllAsync(service, new QueryExpression(TimeTable)
             {
@@ -298,8 +440,18 @@ public sealed class DataverseAppDataService
 
         lock (_detailCacheGate)
         {
-            foreach (var id in ids)
+            foreach (var id in idsToLoad)
                 _timeEntriesByTask[id] = grouped.TryGetValue(id, out var entries) ? entries : [];
+        }
+
+        foreach (var id in idsToLoad)
+        {
+            IReadOnlyList<PomodoroSession> entries;
+            lock (_detailCacheGate)
+            {
+                entries = _timeEntriesByTask.TryGetValue(id, out var cached) ? cached : [];
+            }
+            await WritePersistentCacheAsync($"time-{id:N}", ToCache(entries));
         }
     }
 
@@ -439,6 +591,8 @@ public sealed class DataverseAppDataService
             _commentsByTask.Remove(taskId);
             _timeEntriesByTask.Remove(taskId);
         }
+        DeletePersistentCache($"comments-{taskId:N}");
+        DeletePersistentCache($"time-{taskId:N}");
     }
 
     public async Task UpdateProjectColorAsync(Guid projectId, string colorHex)
@@ -551,11 +705,30 @@ public sealed class DataverseAppDataService
             [CommentSource] = source,
             [CommentAiReviewed] = true
         };
-        await Task.Run(() => service.Create(entity));
+        var id = await Task.Run(() => service.Create(entity));
         lock (_detailCacheGate)
         {
-            _commentsByTask.Remove(taskId);
+            if (_commentsByTask.TryGetValue(taskId, out var cached))
+            {
+                var updated = new List<TaskJournalEntry>
+                {
+                    new()
+                    {
+                        Id = 1,
+                        DataverseId = id,
+                        Content = content.Trim(),
+                        CreatedAt = DateTime.UtcNow
+                    }
+                };
+                updated.AddRange(cached.Select((entry, index) =>
+                {
+                    entry.Id = index + 2;
+                    return entry;
+                }));
+                _commentsByTask[taskId] = updated;
+            }
         }
+        DeletePersistentCache($"comments-{taskId:N}");
     }
 
     public async Task UpdateCommentAsync(Guid commentId, string content)
@@ -574,6 +747,8 @@ public sealed class DataverseAppDataService
             foreach (var taskId in affectedTaskIds)
                 _commentsByTask.Remove(taskId);
         }
+        if (affectedTaskIds.Count == 0) ClearPersistentCacheFiles("comments-*.json");
+        foreach (var taskId in affectedTaskIds) DeletePersistentCache($"comments-{taskId:N}");
     }
 
     public async Task DeleteCommentAsync(Guid commentId)
@@ -587,6 +762,8 @@ public sealed class DataverseAppDataService
             foreach (var taskId in affectedTaskIds)
                 _commentsByTask.Remove(taskId);
         }
+        if (affectedTaskIds.Count == 0) ClearPersistentCacheFiles("comments-*.json");
+        foreach (var taskId in affectedTaskIds) DeletePersistentCache($"comments-{taskId:N}");
     }
 
     public async Task<Guid> AddTimeEntryAsync(Guid taskId, string taskTitle, DateTime startedAt, DateTime endedAt, string note)
@@ -606,8 +783,27 @@ public sealed class DataverseAppDataService
         var id = await Task.Run(() => service.Create(entity));
         lock (_detailCacheGate)
         {
-            _timeEntriesByTask.Remove(taskId);
+            if (_timeEntriesByTask.TryGetValue(taskId, out var cached))
+            {
+                var actualMinutes = Math.Max(1, (int)Math.Ceiling(seconds / 60d));
+                var updated = new List<PomodoroSession>(cached)
+                {
+                    new()
+                    {
+                        Id = cached.Count + 1,
+                        DataverseId = id,
+                        StartedAt = startedAt,
+                        EndedAt = endedAt,
+                        ActualMinutes = actualMinutes,
+                        PlannedMinutes = actualMinutes,
+                        SessionType = PomodoroSessionType.Work,
+                        Completed = true
+                    }
+                };
+                _timeEntriesByTask[taskId] = updated;
+            }
         }
+        DeletePersistentCache($"time-{taskId:N}");
         return id;
     }
 
@@ -631,6 +827,8 @@ public sealed class DataverseAppDataService
             foreach (var taskId in affectedTaskIds)
                 _timeEntriesByTask.Remove(taskId);
         }
+        if (affectedTaskIds.Count == 0) ClearPersistentCacheFiles("time-*.json");
+        foreach (var taskId in affectedTaskIds) DeletePersistentCache($"time-{taskId:N}");
     }
 
     public async Task DeleteTimeEntryAsync(Guid timeEntryId)
@@ -644,6 +842,8 @@ public sealed class DataverseAppDataService
             foreach (var taskId in affectedTaskIds)
                 _timeEntriesByTask.Remove(taskId);
         }
+        if (affectedTaskIds.Count == 0) ClearPersistentCacheFiles("time-*.json");
+        foreach (var taskId in affectedTaskIds) DeletePersistentCache($"time-{taskId:N}");
     }
 
     public void ClearCache()
@@ -654,9 +854,15 @@ public sealed class DataverseAppDataService
             _commentsByTask.Clear();
             _timeEntriesByTask.Clear();
         }
+        ClearPersistentCacheFiles("comments-*.json");
+        ClearPersistentCacheFiles("time-*.json");
     }
 
-    private void InvalidateSnapshot() => _cachedSnapshot = null;
+    private void InvalidateSnapshot()
+    {
+        _cachedSnapshot = null;
+        ClearPersistentCacheFiles("snapshot-*.json");
+    }
 
     private List<Guid> FindCommentCacheKeys(Guid commentId)
     {
@@ -900,6 +1106,259 @@ public sealed class DataverseAppDataService
         InvalidateSnapshot();
     }
 
+    private async Task<T?> ReadPersistentCacheAsync<T>(string cacheName)
+    {
+        try
+        {
+            var path = await GetPersistentCachePathAsync(cacheName);
+            if (!File.Exists(path)) return default;
+
+            await using var stream = File.OpenRead(path);
+            var envelope = await JsonSerializer.DeserializeAsync<PersistentCacheEnvelope<T>>(stream, PersistentCacheJsonOptions);
+            if (envelope is null || envelope.Version != CacheVersion) return default;
+            if (DateTime.UtcNow - envelope.CachedAtUtc > PersistentCacheTtl) return default;
+            return envelope.Data;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DataverseAppDataService] Cache read failed for {cacheName}: {ex.Message}");
+            return default;
+        }
+    }
+
+    private async Task WritePersistentCacheAsync<T>(string cacheName, T data)
+    {
+        try
+        {
+            var path = await GetPersistentCachePathAsync(cacheName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var envelope = new PersistentCacheEnvelope<T>(CacheVersion, DateTime.UtcNow, data);
+            await using var stream = File.Create(path);
+            await JsonSerializer.SerializeAsync(stream, envelope, PersistentCacheJsonOptions);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DataverseAppDataService] Cache write failed for {cacheName}: {ex.Message}");
+        }
+    }
+
+    private async Task<string> GetPersistentCachePathAsync(string cacheName)
+    {
+        AppPaths.EnsureCreated();
+        var hash = await GetCacheEnvironmentHashAsync();
+        return Path.Combine(AppPaths.AppDataRoot, "cache", $"{cacheName}-{hash}.json");
+    }
+
+    private async Task<string> GetCacheEnvironmentHashAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_cacheEnvironmentHash)) return _cacheEnvironmentHash;
+        var environment = (await _settings.GetD365EnvironmentUrlAsync())?.Trim().ToLowerInvariant() ?? "default";
+        _cacheEnvironmentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(environment)))[..12];
+        return _cacheEnvironmentHash;
+    }
+
+    private static void DeletePersistentCache(string cacheName) =>
+        ClearPersistentCacheFiles($"{cacheName}-*.json");
+
+    private static void ClearPersistentCacheFiles(string pattern)
+    {
+        try
+        {
+            var directory = Path.Combine(AppPaths.AppDataRoot, "cache");
+            if (!Directory.Exists(directory)) return;
+            foreach (var file in Directory.EnumerateFiles(directory, pattern))
+                File.Delete(file);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DataverseAppDataService] Cache cleanup failed for {pattern}: {ex.Message}");
+        }
+    }
+
+    private static DataverseTaskSnapshotCache ToCache(DataverseTaskSnapshot snapshot) =>
+        new(
+            snapshot.Projects.Select(project => new ProjectCache(
+                project.Id,
+                project.DataverseId,
+                project.Name,
+                project.Description,
+                project.ColorHex,
+                project.CreatedAt,
+                project.ParentProjectId,
+                project.Customer is null
+                    ? null
+                    : new CustomerCache(
+                        project.Customer.Id,
+                        project.Customer.DataverseId,
+                        project.Customer.Name,
+                        project.Customer.ContactInfo,
+                        project.Customer.Notes,
+                        project.Customer.CreatedAt))).ToList(),
+            snapshot.Tasks.Select(task => new TaskItemCache(
+                task.Id,
+                task.DataverseId,
+                task.ProjectId,
+                task.ParentTaskId,
+                task.Title,
+                task.Description,
+                task.WorkType,
+                task.Priority,
+                task.EstimatedPomodoros,
+                task.DueDate,
+                task.ScheduledStart,
+                task.ScheduledEnd,
+                task.Status,
+                task.CreatedAt,
+                task.CompletedAt,
+                task.RecurrenceJson,
+                task.ChecklistItems.Select(item => new ChecklistItemCache(
+                    item.Id,
+                    item.DataverseId,
+                    item.TaskItemId,
+                    item.Title,
+                    item.IsCompleted,
+                    item.SortOrder,
+                    item.CreatedAt,
+                    item.CompletedAt)).ToList(),
+                task.ScheduleBlocks.Select(block => new ScheduleBlockCache(
+                    block.Id,
+                    block.DataverseId,
+                    block.TaskItemId,
+                    block.Start,
+                    block.End,
+                    block.Source,
+                    block.CreatedAt)).ToList())).ToList());
+
+    private static DataverseTaskSnapshot FromCache(DataverseTaskSnapshotCache cache)
+    {
+        var projects = cache.Projects.Select(project => new Project
+        {
+            Id = project.Id,
+            DataverseId = project.DataverseId,
+            Name = project.Name,
+            Description = project.Description,
+            ColorHex = project.ColorHex,
+            CreatedAt = project.CreatedAt,
+            ParentProjectId = project.ParentProjectId,
+            Customer = project.Customer is null
+                ? null
+                : new Customer
+                {
+                    Id = project.Customer.Id,
+                    DataverseId = project.Customer.DataverseId,
+                    Name = project.Customer.Name,
+                    ContactInfo = project.Customer.ContactInfo,
+                    Notes = project.Customer.Notes,
+                    CreatedAt = project.Customer.CreatedAt
+                }
+        }).ToList();
+        var projectsById = projects.ToDictionary(project => project.Id);
+
+        var tasks = cache.Tasks.Select(task =>
+        {
+            var project = projectsById.TryGetValue(task.ProjectId, out var foundProject)
+                ? foundProject
+                : projects.FirstOrDefault();
+            var taskItem = new TaskItem
+            {
+                Id = task.Id,
+                DataverseId = task.DataverseId,
+                ProjectId = task.ProjectId,
+                Project = project,
+                ParentTaskId = task.ParentTaskId,
+                Title = task.Title,
+                Description = task.Description,
+                WorkType = task.WorkType,
+                Priority = task.Priority,
+                EstimatedPomodoros = task.EstimatedPomodoros,
+                DueDate = task.DueDate,
+                ScheduledStart = task.ScheduledStart,
+                ScheduledEnd = task.ScheduledEnd,
+                Status = task.Status,
+                CreatedAt = task.CreatedAt,
+                CompletedAt = task.CompletedAt,
+                RecurrenceJson = task.RecurrenceJson
+            };
+            taskItem.ChecklistItems = task.ChecklistItems.Select(item => new TaskChecklistItem
+            {
+                Id = item.Id,
+                DataverseId = item.DataverseId,
+                TaskItemId = taskItem.Id,
+                TaskItem = taskItem,
+                Title = item.Title,
+                IsCompleted = item.IsCompleted,
+                SortOrder = item.SortOrder,
+                CreatedAt = item.CreatedAt,
+                CompletedAt = item.CompletedAt
+            }).ToList();
+            taskItem.ScheduleBlocks = task.ScheduleBlocks.Select(block => new TaskScheduleBlock
+            {
+                Id = block.Id,
+                DataverseId = block.DataverseId,
+                TaskItemId = taskItem.Id,
+                TaskItem = taskItem,
+                Start = block.Start,
+                End = block.End,
+                Source = block.Source,
+                CreatedAt = block.CreatedAt
+            }).ToList();
+            project?.Tasks.Add(taskItem);
+            return taskItem;
+        }).ToList();
+
+        return new DataverseTaskSnapshot(projects, tasks);
+    }
+
+    private static List<TaskJournalEntryCache> ToCache(IReadOnlyList<TaskJournalEntry> comments) =>
+        comments.Select(comment => new TaskJournalEntryCache(
+            comment.Id,
+            comment.DataverseId,
+            comment.TaskItemId,
+            comment.Content,
+            comment.CreatedAt,
+            comment.TimesheetLineDataverseId)).ToList();
+
+    private static IReadOnlyList<TaskJournalEntry> FromCache(List<TaskJournalEntryCache> comments) =>
+        comments.Select(comment => new TaskJournalEntry
+        {
+            Id = comment.Id,
+            DataverseId = comment.DataverseId,
+            TaskItemId = comment.TaskItemId,
+            Content = comment.Content,
+            CreatedAt = comment.CreatedAt,
+            TimesheetLineDataverseId = comment.TimesheetLineDataverseId
+        }).ToList();
+
+    private static List<PomodoroSessionCache> ToCache(IReadOnlyList<PomodoroSession> entries) =>
+        entries.Select(entry => new PomodoroSessionCache(
+            entry.Id,
+            entry.DataverseId,
+            entry.TaskItemId,
+            entry.StartedAt,
+            entry.EndedAt,
+            entry.PlannedMinutes,
+            entry.ActualMinutes,
+            entry.SessionType,
+            entry.Completed,
+            entry.InterruptionCount,
+            entry.TimesheetLineDataverseId)).ToList();
+
+    private static IReadOnlyList<PomodoroSession> FromCache(List<PomodoroSessionCache> entries) =>
+        entries.Select(entry => new PomodoroSession
+        {
+            Id = entry.Id,
+            DataverseId = entry.DataverseId,
+            TaskItemId = entry.TaskItemId,
+            StartedAt = entry.StartedAt,
+            EndedAt = entry.EndedAt,
+            PlannedMinutes = entry.PlannedMinutes,
+            ActualMinutes = entry.ActualMinutes,
+            SessionType = entry.SessionType,
+            Completed = entry.Completed,
+            InterruptionCount = entry.InterruptionCount,
+            TimesheetLineDataverseId = entry.TimesheetLineDataverseId
+        }).ToList();
+
     private async Task<ServiceClient> CreateServiceClientAsync()
     {
         var options = new D365Options(
@@ -959,6 +1418,20 @@ public sealed class DataverseAppDataService
         return response.EntityMetadata;
     }
 
+    private string? GetCommentTimesheetLineLookup(ServiceClient service)
+    {
+        if (_commentTimesheetLineLookup is not null) return _commentTimesheetLineLookup;
+        _commentTimesheetLineLookup = FindLookupAttribute(RetrieveMetadata(service, CommentTable), TimesheetLineTable)?.LogicalName ?? string.Empty;
+        return string.IsNullOrWhiteSpace(_commentTimesheetLineLookup) ? null : _commentTimesheetLineLookup;
+    }
+
+    private string? GetTimeTimesheetLineLookup(ServiceClient service)
+    {
+        if (_timeTimesheetLineLookup is not null) return _timeTimesheetLineLookup;
+        _timeTimesheetLineLookup = FindLookupAttribute(RetrieveMetadata(service, TimeTable), TimesheetLineTable)?.LogicalName ?? string.Empty;
+        return string.IsNullOrWhiteSpace(_timeTimesheetLineLookup) ? null : _timeTimesheetLineLookup;
+    }
+
     private static LookupAttributeMetadata? FindLookupAttribute(EntityMetadata metadata, string targetLogicalName) =>
         metadata.Attributes
             .OfType<LookupAttributeMetadata>()
@@ -1006,9 +1479,95 @@ public sealed class DataverseAppDataService
         if (!trimmed.StartsWith('#')) trimmed = "#" + trimmed;
         return trimmed.Length == 7 ? trimmed.ToUpperInvariant() : null;
     }
+
+    private sealed record PersistentCacheEnvelope<T>(int Version, DateTime CachedAtUtc, T Data);
+
+    private sealed record DataverseTaskSnapshotCache(List<ProjectCache> Projects, List<TaskItemCache> Tasks);
+
+    private sealed record ProjectCache(
+        int Id,
+        Guid? DataverseId,
+        string Name,
+        string? Description,
+        string? ColorHex,
+        DateTime CreatedAt,
+        int? ParentProjectId,
+        CustomerCache? Customer);
+
+    private sealed record CustomerCache(
+        int Id,
+        Guid? DataverseId,
+        string Name,
+        string? ContactInfo,
+        string? Notes,
+        DateTime CreatedAt);
+
+    private sealed record TaskItemCache(
+        int Id,
+        Guid? DataverseId,
+        int ProjectId,
+        int? ParentTaskId,
+        string Title,
+        string? Description,
+        WorkType WorkType,
+        TaskPriority Priority,
+        int EstimatedPomodoros,
+        DateTime? DueDate,
+        DateTime? ScheduledStart,
+        DateTime? ScheduledEnd,
+        TaskItemStatus Status,
+        DateTime CreatedAt,
+        DateTime? CompletedAt,
+        string? RecurrenceJson,
+        List<ChecklistItemCache> ChecklistItems,
+        List<ScheduleBlockCache> ScheduleBlocks);
+
+    private sealed record ChecklistItemCache(
+        int Id,
+        Guid? DataverseId,
+        int TaskItemId,
+        string Title,
+        bool IsCompleted,
+        int SortOrder,
+        DateTime CreatedAt,
+        DateTime? CompletedAt);
+
+    private sealed record ScheduleBlockCache(
+        int Id,
+        Guid? DataverseId,
+        int TaskItemId,
+        DateTime Start,
+        DateTime End,
+        string? Source,
+        DateTime CreatedAt);
+
+    private sealed record TaskJournalEntryCache(
+        int Id,
+        Guid? DataverseId,
+        int TaskItemId,
+        string Content,
+        DateTime CreatedAt,
+        Guid? TimesheetLineDataverseId);
+
+    private sealed record PomodoroSessionCache(
+        int Id,
+        Guid? DataverseId,
+        int? TaskItemId,
+        DateTime StartedAt,
+        DateTime? EndedAt,
+        int PlannedMinutes,
+        int ActualMinutes,
+        PomodoroSessionType SessionType,
+        bool Completed,
+        int InterruptionCount,
+        Guid? TimesheetLineDataverseId);
 }
 
 public sealed record DataverseTaskSnapshot(IReadOnlyList<Project> Projects, IReadOnlyList<TaskItem> Tasks);
+
+public sealed record DataverseTaskDetailsSnapshot(
+    IReadOnlyDictionary<Guid, IReadOnlyList<TaskJournalEntry>> CommentsByTask,
+    IReadOnlyDictionary<Guid, IReadOnlyList<PomodoroSession>> TimeEntriesByTask);
 
 public sealed record DataverseTimeEntryContext(Guid Id, Guid? TaskDataverseId, DateTime StartedAt, DateTime? EndedAt, int ActualMinutes);
 

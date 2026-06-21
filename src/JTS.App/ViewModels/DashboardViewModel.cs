@@ -274,10 +274,12 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     private async Task<List<DashboardTimeEntryContext>> LoadTimeForTasksAsync(IEnumerable<TaskItem> tasks, bool forceSync = false)
     {
+        var taskList = tasks.Where(t => t.DataverseId is not null).ToList();
+        var entriesByTask = await _data.LoadTimeEntriesByTaskAsync(taskList.Select(t => t.DataverseId!.Value), forceSync);
         var entries = new List<DashboardTimeEntryContext>();
-        foreach (var task in tasks.Where(t => t.DataverseId is not null))
+        foreach (var task in taskList)
         {
-            var taskEntries = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value, forceSync);
+            var taskEntries = entriesByTask.TryGetValue(task.DataverseId!.Value, out var cached) ? cached : [];
             entries.AddRange(taskEntries.Select(session => new DashboardTimeEntryContext(task, session)));
         }
 
@@ -286,10 +288,10 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     private async Task<Dictionary<Guid, IReadOnlyList<TaskJournalEntry>>> LoadCommentsForTasksAsync(IEnumerable<TaskItem> tasks, bool forceSync = false)
     {
-        var result = new Dictionary<Guid, IReadOnlyList<TaskJournalEntry>>();
-        foreach (var task in tasks.Where(t => t.DataverseId is not null))
-            result[task.DataverseId!.Value] = await _data.LoadCommentsAsync(task.DataverseId.Value, forceSync);
-        return result;
+        return (await _data.LoadCommentsByTaskAsync(
+                tasks.Where(t => t.DataverseId is not null).Select(t => t.DataverseId!.Value),
+                forceSync))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
     }
 
     private async Task<string> BuildProfessionalSummaryAsync(

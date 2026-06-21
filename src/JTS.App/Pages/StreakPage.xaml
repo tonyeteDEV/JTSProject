@@ -67,29 +67,17 @@
                         <TextBlock Grid.Column="5" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="S" />
                         <TextBlock Grid.Column="6" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="D" />
                     </Grid>
-                    <GridView
+                    <ItemsControl
                         Grid.Row="2"
                         HorizontalAlignment="Center"
-                        IsItemClickEnabled="False"
                         ItemTemplate="{StaticResource DayCellTemplate}"
-                        ItemsSource="{x:Bind Cells}"
-                        SelectionMode="None">
-                        <GridView.ItemsPanel>
+                        ItemsSource="{x:Bind Cells}">
+                        <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <ItemsWrapGrid MaximumRowsOrColumns="7" Orientation="Horizontal" />
                             </ItemsPanelTemplate>
-                        </GridView.ItemsPanel>
-                        <GridView.ItemContainerStyle>
-                            <Style TargetType="GridViewItem">
-                                <Setter Property="Padding" Value="0" />
-                                <Setter Property="Margin" Value="0" />
-                                <Setter Property="MinWidth" Value="0" />
-                                <Setter Property="MinHeight" Value="0" />
-                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                            </Style>
-                        </GridView.ItemContainerStyle>
-                    </GridView>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
                 </Grid>
             </Border>
         </DataTemplate>

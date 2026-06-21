@@ -158,7 +158,10 @@ public partial class TasksViewModel : ObservableObject
         if (_tasksById.TryGetValue(SelectedTask.Id, out var selectedTaskModel))
             RebuildChecklistView(selectedTaskModel);
 
-        var comments = await _data.LoadCommentsAsync(taskDataverseId);
+        var details = await _data.LoadTaskDetailsSnapshotAsync([taskDataverseId], forceSync: true);
+        var comments = details.CommentsByTask.TryGetValue(taskDataverseId, out var cachedComments)
+            ? cachedComments
+            : [];
         foreach (var comment in comments)
         {
             var isTransferred = comment.TimesheetLineDataverseId is not null;
@@ -181,7 +184,9 @@ public partial class TasksViewModel : ObservableObject
             }
         }
 
-        var timeEntries = await _data.LoadTimeEntriesAsync(taskDataverseId);
+        var timeEntries = details.TimeEntriesByTask.TryGetValue(taskDataverseId, out var cachedTimeEntries)
+            ? cachedTimeEntries
+            : [];
         SelectedTaskTimeTotalText = $"Total tracked: {FormatDurationSeconds(timeEntries.Sum(session => session.ActualMinutes) * 60)}";
         foreach (var session in timeEntries
             .Where(s => s.DataverseId is not null)

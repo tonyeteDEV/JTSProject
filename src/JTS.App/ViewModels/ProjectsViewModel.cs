@@ -9,6 +9,7 @@ namespace JTS_App.ViewModels;
 public partial class ProjectsViewModel : ObservableObject
 {
     private readonly DataverseAppDataService _data;
+    private IReadOnlyList<TaskItem>? _latestTasks;
 
     public ObservableCollection<ProjectTreeNode> RootNodes { get; } = new();
     public ObservableCollection<Customer> AllCustomers { get; } = new();
@@ -46,6 +47,7 @@ public partial class ProjectsViewModel : ObservableObject
         var snapshot = await _data.LoadTaskSnapshotAsync(forceSync);
         var projects = snapshot.Projects.OrderBy(p => p.Name).ToList();
         var tasks = snapshot.Tasks;
+        _latestTasks = tasks;
         var customers = Array.Empty<Customer>();
 
         AllCustomers.Clear();
@@ -65,10 +67,12 @@ public partial class ProjectsViewModel : ObservableObject
                 RootNodes.Add(node);
         }
 
+        var tasksWithDataverseId = tasks.Where(t => t.DataverseId is not null).ToList();
+        var entriesByTask = await _data.LoadTimeEntriesByTaskAsync(tasksWithDataverseId.Select(t => t.DataverseId!.Value), forceSync);
         var minutesByProject = new Dictionary<int, int>();
-        foreach (var task in tasks.Where(t => t.DataverseId is not null))
+        foreach (var task in tasksWithDataverseId)
         {
-            var entries = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value);
+            var entries = entriesByTask.TryGetValue(task.DataverseId!.Value, out var cached) ? cached : [];
             minutesByProject[task.ProjectId] = minutesByProject.GetValueOrDefault(task.ProjectId)
                 + entries.Sum(e => Math.Max(0, e.ActualMinutes));
         }
@@ -91,15 +95,17 @@ public partial class ProjectsViewModel : ObservableObject
         SelectedProjectTimeTotalText = "Total tracked: 0m";
         if (SelectedNode?.Project is not { } project) return;
 
-        tasks ??= (await _data.LoadTaskSnapshotAsync()).Tasks;
+        tasks ??= _latestTasks ?? (await _data.LoadTaskSnapshotAsync()).Tasks;
         var projectTasks = tasks.Where(t => t.ProjectId == project.Id).ToList();
         foreach (var task in projectTasks.Where(t => t.ParentTaskId == null).OrderBy(t => t.CreatedAt))
             SelectedProjectTasks.Add(task);
 
         var entriesByDate = new Dictionary<DateTime, int>();
-        foreach (var task in projectTasks.Where(t => t.DataverseId is not null))
+        var tasksWithDataverseId = projectTasks.Where(t => t.DataverseId is not null).ToList();
+        var entriesByTask = await _data.LoadTimeEntriesByTaskAsync(tasksWithDataverseId.Select(t => t.DataverseId!.Value));
+        foreach (var task in tasksWithDataverseId)
         {
-            var entries = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value);
+            var entries = entriesByTask.TryGetValue(task.DataverseId!.Value, out var cached) ? cached : [];
             foreach (var entry in entries)
             {
                 var workDate = DisplayFormat.ToSpainTime(entry.StartedAt).Date;

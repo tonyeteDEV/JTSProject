@@ -1,6 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
+using JTS.Data;
+using JTS.Data.Entities;
 using JTS_App.Services;
 
 namespace JTS_App.ViewModels;
@@ -15,11 +20,13 @@ public enum StreakCellKind
 public sealed partial class StreakViewModel : ObservableObject
 {
     private static readonly CultureInfo EnGb = CultureInfo.GetCultureInfo("en-GB");
+    private static readonly JsonSerializerOptions CacheJsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly DataverseAppDataService _data;
     private readonly AppSettingsService _settings;
 
     private readonly Dictionary<DateTime, DayData> _daysData = new();
+    private int _todayRefreshGeneration;
     private double _goalHours = 8;
     private StreakDay? _todayCell;
 
@@ -60,6 +67,7 @@ public sealed partial class StreakViewModel : ObservableObject
     public async Task LoadAsync(bool forceSync = false)
     {
         if (IsBusy) return;
+        var refreshTodayInBackground = false;
         IsBusy = true;
         try
         {
@@ -67,7 +75,7 @@ public sealed partial class StreakViewModel : ObservableObject
             _goalHours = double.TryParse(goalRaw, NumberStyles.Float, CultureInfo.InvariantCulture, out var goal) && goal > 0 ? goal : 8;
             GoalText = $"Daily goal: {_goalHours:0.#}h";
 
-            await LoadYearDataAsync(forceSync);
+            refreshTodayInBackground = await LoadYearDataAsync(forceSync);
             BuildMonths();
             BuildStats();
             SelectDefaultDay();
@@ -76,6 +84,9 @@ public sealed partial class StreakViewModel : ObservableObject
         {
             IsBusy = false;
         }
+
+        if (refreshTodayInBackground)
+            _ = RefreshTodayInBackgroundAsync(Year, ++_todayRefreshGeneration);
     }
 
     public async Task GoToPreviousYearAsync()
@@ -98,24 +109,80 @@ public sealed partial class StreakViewModel : ObservableObject
         await LoadAsync();
     }
 
-    private async Task LoadYearDataAsync(bool forceSync)
+    private async Task<bool> LoadYearDataAsync(bool forceSync)
     {
         _daysData.Clear();
         CanGoNext = Year < DateTime.Today.Year;
 
+        var today = DateTime.Today;
+        if (!forceSync && await TryLoadCachedYearAsync())
+            return Year == today.Year;
+
+        await LoadYearDataFromDataverseAsync(forceSync);
+        await SaveCachedYearAsync();
+        return false;
+    }
+
+    private async Task LoadYearDataFromDataverseAsync(bool forceSync)
+    {
         var yearStart = new DateTime(Year, 1, 1);
         var yearEnd = new DateTime(Year, 12, 31);
 
         var snapshot = await _data.LoadTaskSnapshotAsync(forceSync);
-        foreach (var task in snapshot.Tasks.Where(t => t.DataverseId is not null))
+        var tasksWithDataverseId = snapshot.Tasks.Where(t => t.DataverseId is not null).ToList();
+        var details = await _data.LoadTaskDetailsSnapshotAsync(tasksWithDataverseId.Select(t => t.DataverseId!.Value), forceSync);
+        ApplyTaskDetailsToDays(tasksWithDataverseId, details, yearStart, yearEnd);
+    }
+
+    private async Task LoadSingleDayFromDataverseAsync(DateTime day)
+    {
+        var snapshot = await _data.LoadTaskSnapshotAsync(forceSync: false);
+        var tasksWithDataverseId = snapshot.Tasks.Where(t => t.DataverseId is not null).ToList();
+        var details = await _data.LoadTaskDetailsForSpainDateAsync(tasksWithDataverseId.Select(t => t.DataverseId!.Value), day);
+        ApplyTaskDetailsToDays(tasksWithDataverseId, details, day.Date, day.Date);
+    }
+
+    private async Task RefreshTodayInBackgroundAsync(int requestedYear, int generation)
+    {
+        try
         {
-            var sessions = await _data.LoadTimeEntriesAsync(task.DataverseId!.Value, forceSync);
+            var today = DateTime.Today;
+            if (requestedYear != today.Year) return;
+
+            _daysData.Remove(today);
+            await LoadSingleDayFromDataverseAsync(today);
+            await SaveCachedYearAsync();
+
+            if (generation != _todayRefreshGeneration || Year != requestedYear) return;
+
+            var selectedDate = _selectedDay?.Date;
+            BuildMonths();
+            BuildStats();
+            SelectDay(FindDayCell(selectedDate) ?? _todayCell ?? FindDayCell(today)!);
+        }
+        catch
+        {
+            // The cached view is still valid enough to use; the next manual refresh will retry Dataverse.
+        }
+    }
+
+    private void ApplyTaskDetailsToDays(
+        IReadOnlyList<TaskItem> tasksWithDataverseId,
+        DataverseTaskDetailsSnapshot details,
+        DateTime rangeStart,
+        DateTime rangeEnd)
+    {
+        foreach (var task in tasksWithDataverseId)
+        {
+            var sessions = details.TimeEntriesByTask.TryGetValue(task.DataverseId!.Value, out var cachedSessions)
+                ? cachedSessions
+                : [];
             foreach (var session in sessions)
             {
                 var minutes = session.ActualMinutes;
                 if (minutes <= 0) continue;
                 var day = DisplayFormat.ToSpainTime(session.StartedAt).Date;
-                if (day < yearStart || day > yearEnd) continue;
+                if (day < rangeStart || day > rangeEnd) continue;
 
                 var data = GetOrCreate(day);
                 data.Minutes += minutes;
@@ -126,15 +193,92 @@ public sealed partial class StreakViewModel : ObservableObject
                     data.Tasks[task.Title] = (projectName, minutes);
             }
 
-            var comments = await _data.LoadCommentsAsync(task.DataverseId.Value, forceSync);
+            var comments = details.CommentsByTask.TryGetValue(task.DataverseId.Value, out var cachedComments)
+                ? cachedComments
+                : [];
             foreach (var comment in comments)
             {
                 if (string.IsNullOrWhiteSpace(comment.Content)) continue;
                 var day = DisplayFormat.ToSpainTime(comment.CreatedAt).Date;
-                if (day < yearStart || day > yearEnd) continue;
+                if (day < rangeStart || day > rangeEnd) continue;
                 GetOrCreate(day).Comments.Add(comment.Content.Trim());
             }
         }
+    }
+
+    private async Task<bool> TryLoadCachedYearAsync()
+    {
+        try
+        {
+            var path = await GetCachePathAsync();
+            if (!File.Exists(path)) return false;
+
+            await using var stream = File.OpenRead(path);
+            var cache = await JsonSerializer.DeserializeAsync<StreakYearCache>(stream, CacheJsonOptions);
+            if (cache is null || cache.Version != 1 || cache.Year != Year) return false;
+
+            foreach (var day in cache.Days)
+            {
+                var data = GetOrCreate(day.Date.Date);
+                data.Minutes = Math.Max(0, day.Minutes);
+                data.Comments.Clear();
+                data.Comments.AddRange(day.Comments.Where(comment => !string.IsNullOrWhiteSpace(comment)));
+                data.Tasks.Clear();
+                foreach (var task in day.Tasks.Where(task => !string.IsNullOrWhiteSpace(task.Title)))
+                    data.Tasks[task.Title] = (task.Project, Math.Max(0, task.Minutes));
+            }
+
+            return true;
+        }
+        catch
+        {
+            _daysData.Clear();
+            return false;
+        }
+    }
+
+    private async Task SaveCachedYearAsync()
+    {
+        try
+        {
+            var today = DateTime.Today;
+            var cacheThrough = Year < today.Year
+                ? new DateTime(Year, 12, 31)
+                : Year == today.Year
+                    ? today
+                    : DateTime.MinValue;
+
+            var days = _daysData
+                .Where(kvp => kvp.Key.Year == Year && kvp.Key <= cacheThrough)
+                .OrderBy(kvp => kvp.Key)
+                .Select(kvp => new StreakCachedDay(
+                    kvp.Key,
+                    kvp.Value.Minutes,
+                    kvp.Value.Tasks
+                        .OrderBy(task => task.Key)
+                        .Select(task => new StreakCachedTask(task.Key, task.Value.Project, task.Value.Minutes))
+                        .ToList(),
+                    kvp.Value.Comments.ToList()))
+                .ToList();
+
+            var cache = new StreakYearCache(1, Year, DateTime.UtcNow, cacheThrough, days);
+            var path = await GetCachePathAsync();
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await using var stream = File.Create(path);
+            await JsonSerializer.SerializeAsync(stream, cache, CacheJsonOptions);
+        }
+        catch
+        {
+            // Cache failures should never block the Streak view; Dataverse remains the source of truth.
+        }
+    }
+
+    private async Task<string> GetCachePathAsync()
+    {
+        AppPaths.EnsureCreated();
+        var environment = (await _settings.GetD365EnvironmentUrlAsync())?.Trim().ToLowerInvariant() ?? "default";
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(environment)))[..12];
+        return Path.Combine(AppPaths.AppDataRoot, "cache", $"streak-{hash}-{Year}.json");
     }
 
     private DayData GetOrCreate(DateTime day)
@@ -253,6 +397,14 @@ public sealed partial class StreakViewModel : ObservableObject
             ClearSelection();
     }
 
+    private StreakDay? FindDayCell(DateTime? date)
+    {
+        if (date is null) return null;
+        return Months
+            .SelectMany(month => month.Cells)
+            .FirstOrDefault(cell => cell.Kind == StreakCellKind.Day && cell.Date == date.Value.Date);
+    }
+
     public void SelectDay(StreakDay day)
     {
         if (day.Kind != StreakCellKind.Day) return;
@@ -307,6 +459,21 @@ public sealed partial class StreakViewModel : ObservableObject
         public Dictionary<string, (string Project, int Minutes)> Tasks { get; } = new();
         public List<string> Comments { get; } = new();
     }
+
+    private sealed record StreakYearCache(
+        int Version,
+        int Year,
+        DateTime CachedAtUtc,
+        DateTime CacheThrough,
+        List<StreakCachedDay> Days);
+
+    private sealed record StreakCachedDay(
+        DateTime Date,
+        int Minutes,
+        List<StreakCachedTask> Tasks,
+        List<string> Comments);
+
+    private sealed record StreakCachedTask(string Title, string Project, int Minutes);
 }
 
 public sealed partial class StreakDay : ObservableObject
