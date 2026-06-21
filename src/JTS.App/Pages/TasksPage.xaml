@@ -430,7 +430,19 @@
                     </ListView.ItemTemplate>
                 </ListView>
 
-                <TextBlock Grid.Row="2" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Calendar assignments" />
+                <Grid Grid.Row="2" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource BodyStrongTextBlockStyle}" Text="Calendar assignments" />
+                    <Button Grid.Column="1" Click="Recurrence_Click" ToolTipService.ToolTip="Create or edit a recurring assignment">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="13" Glyph="&#xE895;" />
+                            <TextBlock Text="Recurrence" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
                 <ListView Grid.Row="3" ItemsSource="{x:Bind ViewModel.SelectedTaskCalendarBlocks, Mode=OneWay}">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="vm:TaskCalendarBlockView">
@@ -683,6 +695,105 @@
                         <Button Grid.Column="1" HorizontalAlignment="Stretch" Click="CancelTaskEditor_Click">
                             <TextBlock Text="Cancel" />
                         </Button>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Recurrence editor overlay -->
+        <Grid
+            Grid.RowSpan="4"
+            Grid.ColumnSpan="2"
+            Background="#B0000000"
+            Visibility="{x:Bind ViewModel.IsRecurrenceEditorVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border
+                Width="700"
+                MaxHeight="820"
+                Margin="0,28,0,28"
+                Padding="26"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Stretch"
+                Background="#202830"
+                BorderBrush="#3A414C"
+                BorderThickness="1"
+                CornerRadius="10">
+                <Grid RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Recurring assignment" />
+                        <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="{x:Bind ViewModel.RecurrenceStatus, Mode=OneWay}" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <CalendarDatePicker Header="Start date" FirstDayOfWeek="Monday" HorizontalAlignment="Stretch" DateFormat="{}{day.integer(2)}/{month.integer(2)}/{year.full}" Date="{x:Bind ViewModel.RecurrenceStartDate, Mode=TwoWay}" />
+                        <CalendarDatePicker Grid.Column="1" Header="End date" FirstDayOfWeek="Monday" HorizontalAlignment="Stretch" DateFormat="{}{day.integer(2)}/{month.integer(2)}/{year.full}" Date="{x:Bind ViewModel.RecurrenceEndDate, Mode=TwoWay}" />
+                    </Grid>
+
+                    <Grid Grid.Row="2" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TimePicker Header="From (all)" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.RecurrenceMasterFrom, Mode=TwoWay}" />
+                        <TimePicker Grid.Column="1" Header="To (all)" ClockIdentifier="24HourClock" Time="{x:Bind ViewModel.RecurrenceMasterTo, Mode=TwoWay}" />
+                        <Button Grid.Column="2" VerticalAlignment="Bottom" Click="RecurrenceApplyAll_Click">
+                            <TextBlock Text="Apply to all days" />
+                        </Button>
+                    </Grid>
+
+                    <TextBlock Grid.Row="3" Style="{StaticResource MutedTextBlockStyle}" Text="Tick weekdays; tune each day's hours if needed." />
+
+                    <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.RecurrenceDays, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RecurrenceDayRow">
+                                    <Grid Padding="0,4,0,4" ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox VerticalAlignment="Center" Content="{x:Bind DayName}" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" />
+                                        <TimePicker Grid.Column="1" ClockIdentifier="24HourClock" Time="{x:Bind From, Mode=TwoWay}" />
+                                        <TimePicker Grid.Column="2" ClockIdentifier="24HourClock" Time="{x:Bind To, Mode=TwoWay}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <Grid Grid.Row="5" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            Click="DeleteRecurrence_Click"
+                            HorizontalAlignment="Left"
+                            Visibility="{x:Bind ViewModel.HasExistingRecurrence, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="Delete recurrence" />
+                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                            <Button Click="CancelRecurrence_Click">
+                                <TextBlock Text="Cancel" />
+                            </Button>
+                            <Button Click="SaveRecurrence_Click" Style="{StaticResource JtsAccentButtonStyle}">
+                                <TextBlock Text="Save" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </Border>

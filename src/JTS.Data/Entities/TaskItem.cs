@@ -27,6 +27,8 @@ public class TaskItem
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? CompletedAt { get; set; }
 
+    public string? RecurrenceJson { get; set; }
+
     public List<TaskJournalEntry> JournalEntries { get; set; } = new();
     public List<TaskChecklistItem> ChecklistItems { get; set; } = new();
     public List<PomodoroSession> PomodoroSessions { get; set; } = new();

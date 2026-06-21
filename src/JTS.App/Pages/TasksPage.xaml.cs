@@ -262,6 +262,29 @@ public sealed partial class TasksPage : Page, IRefreshablePage
         await ViewModel.DeleteChecklistItemAsync(index);
     }
 
+    private void Recurrence_Click(object sender, RoutedEventArgs e) => ViewModel.OpenRecurrenceEditor();
+
+    private void RecurrenceApplyAll_Click(object sender, RoutedEventArgs e) => ViewModel.ApplyMasterHoursToAllDays();
+
+    private void CancelRecurrence_Click(object sender, RoutedEventArgs e) => ViewModel.CancelRecurrenceEditor();
+
+    private async void SaveRecurrence_Click(object sender, RoutedEventArgs e) => await ViewModel.SaveRecurrenceAsync();
+
+    private async void DeleteRecurrence_Click(object sender, RoutedEventArgs e)
+    {
+        var confirm = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Delete recurrence?",
+            Content = "This removes the recurrence and its future blocks (from tomorrow). Past and today's blocks are kept.",
+            PrimaryButtonText = "Delete",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await confirm.ShowAsync() == ContentDialogResult.Primary)
+            await ViewModel.DeleteRecurrenceAsync();
+    }
+
     private async void EditTimeEntry_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not TaskTimeByDayView entry) return;

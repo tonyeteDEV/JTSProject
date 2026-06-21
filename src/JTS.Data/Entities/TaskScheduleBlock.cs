@@ -8,5 +8,6 @@ public class TaskScheduleBlock
     public TaskItem? TaskItem { get; set; }
     public DateTime Start { get; set; }
     public DateTime End { get; set; }
+    public string? Source { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

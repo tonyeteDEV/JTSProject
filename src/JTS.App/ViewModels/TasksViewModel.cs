@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using JTS.Core;
 using JTS.Data.Entities;
@@ -24,8 +25,16 @@ public partial class TasksViewModel : ObservableObject
     public ObservableCollection<TaskTimeByDayView> SelectedTaskTimeByDay { get; } = new();
     public ObservableCollection<TaskCalendarBlockView> SelectedTaskCalendarBlocks { get; } = new();
     public ObservableCollection<ChecklistItemView> SelectedTaskChecklist { get; } = new();
+    public ObservableCollection<RecurrenceDayRow> RecurrenceDays { get; } = new();
 
     [ObservableProperty] private TaskRowView? _selectedTask;
+    [ObservableProperty] private bool _isRecurrenceEditorVisible;
+    [ObservableProperty] private bool _hasExistingRecurrence;
+    [ObservableProperty] private DateTimeOffset? _recurrenceStartDate;
+    [ObservableProperty] private DateTimeOffset? _recurrenceEndDate;
+    [ObservableProperty] private TimeSpan _recurrenceMasterFrom = TimeSpan.FromHours(10);
+    [ObservableProperty] private TimeSpan _recurrenceMasterTo = TimeSpan.FromHours(12);
+    [ObservableProperty] private string _recurrenceStatus = string.Empty;
     [ObservableProperty] private string _selectedTaskChecklistProgress = "0/0";
     [ObservableProperty] private string _selectedTaskTimeTotalText = "Total tracked: 0m";
     [ObservableProperty] private bool _selectedTaskHasTimesheetLinks;
@@ -55,6 +64,15 @@ public partial class TasksViewModel : ObservableObject
     public TasksViewModel(DataverseAppDataService data)
     {
         _data = data;
+        foreach (var (day, name) in new[]
+        {
+            (DayOfWeek.Monday, "Monday"), (DayOfWeek.Tuesday, "Tuesday"), (DayOfWeek.Wednesday, "Wednesday"),
+            (DayOfWeek.Thursday, "Thursday"), (DayOfWeek.Friday, "Friday"), (DayOfWeek.Saturday, "Saturday"),
+            (DayOfWeek.Sunday, "Sunday")
+        })
+        {
+            RecurrenceDays.Add(new RecurrenceDayRow(day, name));
+        }
     }
 
     public async Task LoadAsync(bool forceSync = false)
@@ -316,6 +334,163 @@ public partial class TasksViewModel : ObservableObject
         SelectedTaskChecklistProgress = $"{done}/{task.ChecklistItems.Count}";
     }
 
+    public void OpenRecurrenceEditor()
+    {
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task)) return;
+
+        foreach (var row in RecurrenceDays)
+        {
+            row.IsSelected = false;
+            row.From = TimeSpan.FromHours(10);
+            row.To = TimeSpan.FromHours(12);
+        }
+        RecurrenceMasterFrom = TimeSpan.FromHours(10);
+        RecurrenceMasterTo = TimeSpan.FromHours(12);
+
+        var def = ParseRecurrence(task.RecurrenceJson);
+        if (def is not null)
+        {
+            HasExistingRecurrence = true;
+            RecurrenceStartDate = new DateTimeOffset(def.StartDate);
+            RecurrenceEndDate = new DateTimeOffset(def.EndDate);
+            foreach (var dayDef in def.Days)
+            {
+                var row = RecurrenceDays.FirstOrDefault(r => r.Day == dayDef.Day);
+                if (row is null) continue;
+                row.IsSelected = true;
+                if (TimeSpan.TryParse(dayDef.From, out var from)) row.From = from;
+                if (TimeSpan.TryParse(dayDef.To, out var to)) row.To = to;
+            }
+            RecurrenceStatus = "Saving updates all recurring blocks from tomorrow onward (manual moves included).";
+        }
+        else
+        {
+            HasExistingRecurrence = false;
+            RecurrenceStartDate = new DateTimeOffset(DateTime.Today);
+            RecurrenceEndDate = new DateTimeOffset(DateTime.Today.AddDays(7));
+            RecurrenceStatus = string.Empty;
+        }
+
+        IsRecurrenceEditorVisible = true;
+    }
+
+    public void ApplyMasterHoursToAllDays()
+    {
+        foreach (var row in RecurrenceDays)
+        {
+            row.From = RecurrenceMasterFrom;
+            row.To = RecurrenceMasterTo;
+        }
+    }
+
+    public void CancelRecurrenceEditor() => IsRecurrenceEditorVisible = false;
+
+    public async Task SaveRecurrenceAsync()
+    {
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task) ||
+            task.DataverseId is not Guid taskDataverseId) return;
+        if (RecurrenceStartDate is not DateTimeOffset start || RecurrenceEndDate is not DateTimeOffset end)
+        {
+            RecurrenceStatus = "Pick a start and end date.";
+            return;
+        }
+        if (end.Date < start.Date)
+        {
+            RecurrenceStatus = "The end date must be on or after the start date.";
+            return;
+        }
+        var selectedRows = RecurrenceDays.Where(r => r.IsSelected).ToList();
+        if (selectedRows.Count == 0)
+        {
+            RecurrenceStatus = "Select at least one weekday.";
+            return;
+        }
+        if (selectedRows.Any(r => r.To <= r.From))
+        {
+            RecurrenceStatus = "Each selected day needs an end time after its start time.";
+            return;
+        }
+
+        var def = new TaskRecurrenceDefinition
+        {
+            StartDate = start.Date,
+            EndDate = end.Date,
+            Days = selectedRows.Select(r => new RecurrenceDay
+            {
+                Day = r.Day,
+                From = r.From.ToString(@"hh\:mm"),
+                To = r.To.ToString(@"hh\:mm")
+            }).ToList()
+        };
+        var json = JsonSerializer.Serialize(def);
+        var wasExisting = HasExistingRecurrence;
+
+        RecurrenceStatus = "Saving recurrence...";
+        await _data.UpdateTaskRecurrenceAsync(taskDataverseId, json);
+
+        var tomorrow = DateTime.Today.AddDays(1);
+        DateTime generateFrom;
+        if (wasExisting)
+        {
+            await _data.DeleteRecurrenceBlocksFromAsync(taskDataverseId, tomorrow);
+            generateFrom = def.StartDate < tomorrow ? tomorrow : def.StartDate;
+        }
+        else
+        {
+            generateFrom = def.StartDate;
+        }
+
+        var blocks = BuildRecurrenceBlocks(def, generateFrom, def.EndDate);
+        await _data.AddCalendarBlocksAsync(taskDataverseId, task.Title, blocks, "Recurrence");
+
+        task.RecurrenceJson = json;
+        IsRecurrenceEditorVisible = false;
+        await LoadAsync(forceSync: true);
+        await LoadSelectedTaskDetailsAsync();
+    }
+
+    public async Task DeleteRecurrenceAsync()
+    {
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task) ||
+            task.DataverseId is not Guid taskDataverseId) return;
+
+        await _data.UpdateTaskRecurrenceAsync(taskDataverseId, null);
+        await _data.DeleteRecurrenceBlocksFromAsync(taskDataverseId, DateTime.Today.AddDays(1));
+        task.RecurrenceJson = null;
+        IsRecurrenceEditorVisible = false;
+        await LoadAsync(forceSync: true);
+        await LoadSelectedTaskDetailsAsync();
+    }
+
+    private static TaskRecurrenceDefinition? ParseRecurrence(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<TaskRecurrenceDefinition>(json);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static List<(DateTime Start, DateTime End)> BuildRecurrenceBlocks(TaskRecurrenceDefinition def, DateTime fromDate, DateTime toDate)
+    {
+        var byDay = def.Days
+            .GroupBy(d => d.Day)
+            .ToDictionary(g => g.Key, g => g.First());
+        var result = new List<(DateTime, DateTime)>();
+        for (var date = fromDate.Date; date <= toDate.Date; date = date.AddDays(1))
+        {
+            if (!byDay.TryGetValue(date.DayOfWeek, out var dayDef)) continue;
+            if (!TimeSpan.TryParse(dayDef.From, out var from) ||
+                !TimeSpan.TryParse(dayDef.To, out var to) || to <= from) continue;
+            result.Add((date.Add(from), date.Add(to)));
+        }
+        return result;
+    }
+
     public Task<TaskItem?> GetFullTaskAsync(int taskId)
     {
         if (!_tasksById.TryGetValue(taskId, out var task))
@@ -376,6 +551,36 @@ public sealed record TaskCalendarBlockView(string DateText, string TimeRange, st
 public sealed record TaskJournalEntryView(Guid? DataverseId, string CreatedAtText, string Content, bool IsTimesheetTransferred, bool IsEditable);
 
 public sealed record ChecklistItemView(int Index, string Title, bool IsCompleted);
+
+public sealed class TaskRecurrenceDefinition
+{
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public List<RecurrenceDay> Days { get; set; } = new();
+}
+
+public sealed class RecurrenceDay
+{
+    public DayOfWeek Day { get; set; }
+    public string From { get; set; } = "10:00";
+    public string To { get; set; } = "12:00";
+}
+
+public partial class RecurrenceDayRow : ObservableObject
+{
+    public DayOfWeek Day { get; }
+    public string DayName { get; }
+
+    [ObservableProperty] private bool _isSelected;
+    [ObservableProperty] private TimeSpan _from = TimeSpan.FromHours(10);
+    [ObservableProperty] private TimeSpan _to = TimeSpan.FromHours(12);
+
+    public RecurrenceDayRow(DayOfWeek day, string dayName)
+    {
+        Day = day;
+        DayName = dayName;
+    }
+}
 
 public class TaskRowView
 {

@@ -33,6 +33,7 @@ public sealed class DataverseAppDataService
     private const string TaskDueDate = "jts_duedate";
     private const string TaskMobileVisible = "jts_mobilevisible";
     private const string TaskChecklist = "jts_checklist";
+    private const string TaskRecurrence = "jts_recurrence";
 
     private const string CalendarTable = "jts_bloquecalendario";
     private const string CalendarTask = "jts_taskid";
@@ -451,23 +452,36 @@ public sealed class DataverseAppDataService
         InvalidateSnapshot();
     }
 
-    public async Task<Guid> AddCalendarBlockAsync(Guid taskId, string taskTitle, DateTime startedAt, DateTime endedAt)
+    public async Task<Guid> AddCalendarBlockAsync(Guid taskId, string taskTitle, DateTime startedAt, DateTime endedAt, string source = "Desktop")
     {
         using var service = await CreateServiceClientAsync();
-        var startUtc = DisplayFormat.SpainTimeToUtc(startedAt);
-        var endUtc = DisplayFormat.SpainTimeToUtc(endedAt);
-        var entity = new Entity(CalendarTable)
-        {
-            [CalendarName] = $"{taskTitle} {startedAt:yyyy-MM-dd HH:mm}",
-            [CalendarTask] = new EntityReference(TaskTable, taskId),
-            [CalendarStart] = startUtc,
-            [CalendarEnd] = endUtc,
-            [CalendarSource] = "Desktop"
-        };
+        var entity = BuildCalendarBlockEntity(taskId, taskTitle, startedAt, endedAt, source);
         var id = await Task.Run(() => service.Create(entity));
         InvalidateSnapshot();
         return id;
     }
+
+    public async Task AddCalendarBlocksAsync(Guid taskId, string taskTitle, IReadOnlyList<(DateTime Start, DateTime End)> blocks, string source)
+    {
+        if (blocks.Count == 0) return;
+        using var service = await CreateServiceClientAsync();
+        await Task.Run(() =>
+        {
+            foreach (var block in blocks)
+                service.Create(BuildCalendarBlockEntity(taskId, taskTitle, block.Start, block.End, source));
+        });
+        InvalidateSnapshot();
+    }
+
+    private static Entity BuildCalendarBlockEntity(Guid taskId, string taskTitle, DateTime startedAt, DateTime endedAt, string source) =>
+        new(CalendarTable)
+        {
+            [CalendarName] = $"{taskTitle} {startedAt:yyyy-MM-dd HH:mm}",
+            [CalendarTask] = new EntityReference(TaskTable, taskId),
+            [CalendarStart] = DisplayFormat.SpainTimeToUtc(startedAt),
+            [CalendarEnd] = DisplayFormat.SpainTimeToUtc(endedAt),
+            [CalendarSource] = source
+        };
 
     public async Task UpdateCalendarBlockAsync(Guid blockId, DateTime startedAt, DateTime endedAt)
     {
@@ -475,8 +489,45 @@ public sealed class DataverseAppDataService
         var entity = new Entity(CalendarTable, blockId)
         {
             [CalendarStart] = DisplayFormat.SpainTimeToUtc(startedAt),
-            [CalendarEnd] = DisplayFormat.SpainTimeToUtc(endedAt),
-            [CalendarSource] = "Desktop"
+            [CalendarEnd] = DisplayFormat.SpainTimeToUtc(endedAt)
+        };
+        await Task.Run(() => service.Update(entity));
+        InvalidateSnapshot();
+    }
+
+    public async Task DeleteRecurrenceBlocksFromAsync(Guid taskId, DateTime fromDateSpain)
+    {
+        using var service = await CreateServiceClientAsync();
+        var fromUtc = DisplayFormat.SpainTimeToUtc(fromDateSpain.Date);
+        var query = new QueryExpression(CalendarTable)
+        {
+            ColumnSet = new ColumnSet("jts_bloquecalendarioid"),
+            Criteria = new FilterExpression
+            {
+                Conditions =
+                {
+                    new ConditionExpression(CalendarTask, ConditionOperator.Equal, taskId),
+                    new ConditionExpression(CalendarSource, ConditionOperator.Equal, "Recurrence"),
+                    new ConditionExpression(CalendarStart, ConditionOperator.GreaterEqual, fromUtc)
+                }
+            }
+        };
+        var rows = await RetrieveAllAsync(service, query);
+        await Task.Run(() =>
+        {
+            foreach (var row in rows)
+                service.Delete(CalendarTable, row.Id);
+        });
+        InvalidateSnapshot();
+    }
+
+    public async Task UpdateTaskRecurrenceAsync(Guid taskId, string? json)
+    {
+        using var service = await CreateServiceClientAsync();
+        var entity = new Entity(TaskTable, taskId)
+        {
+            [TaskRecurrence] = json,
+            [TaskMobileVisible] = true
         };
         await Task.Run(() => service.Update(entity));
         InvalidateSnapshot();
@@ -694,7 +745,7 @@ public sealed class DataverseAppDataService
         var rows = await RetrieveAllAsync(service, new QueryExpression(TaskTable)
         {
             ColumnSet = new ColumnSet(TaskId, TaskTitle, TaskDescription, TaskPriorityCode, TaskScheduledStart, TaskScheduledEnd,
-                TaskRegarding, TaskProject, TaskWorkType, TaskAppStatus, TaskEstimatedMinutes, TaskDueDate, TaskMobileVisible, TaskChecklist),
+                TaskRegarding, TaskProject, TaskWorkType, TaskAppStatus, TaskEstimatedMinutes, TaskDueDate, TaskMobileVisible, TaskChecklist, TaskRecurrence),
             Criteria = new FilterExpression(LogicalOperator.Or)
             {
                 Conditions =
@@ -735,6 +786,7 @@ public sealed class DataverseAppDataService
                 EstimatedPomodoros = Math.Max(0, (int)Math.Ceiling((row.GetAttributeValue<int?>(TaskEstimatedMinutes) ?? 0) / 30d))
             };
             task.ChecklistItems = DeserializeChecklist(row.GetAttributeValue<string>(TaskChecklist), task.Id);
+            task.RecurrenceJson = row.GetAttributeValue<string>(TaskRecurrence);
 
             tasks.Add(task);
         }
@@ -746,7 +798,7 @@ public sealed class DataverseAppDataService
     {
         var rows = await RetrieveAllAsync(service, new QueryExpression(CalendarTable)
         {
-            ColumnSet = new ColumnSet("jts_bloquecalendarioid", CalendarTask, CalendarStart, CalendarEnd)
+            ColumnSet = new ColumnSet("jts_bloquecalendarioid", CalendarTask, CalendarStart, CalendarEnd, CalendarSource)
         });
         var tasksByDataverseId = tasks.Where(t => t.DataverseId is not null).ToDictionary(t => t.DataverseId!.Value);
         var blockIndex = 1;
@@ -774,7 +826,8 @@ public sealed class DataverseAppDataService
                 TaskItemId = task.Id,
                 TaskItem = task,
                 Start = start.Value,
-                End = end.Value
+                End = end.Value,
+                Source = row.GetAttributeValue<string>(CalendarSource)
             });
         }
     }
