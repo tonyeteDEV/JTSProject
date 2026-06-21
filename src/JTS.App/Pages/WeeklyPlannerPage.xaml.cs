@@ -921,6 +921,66 @@ public sealed partial class WeeklyPlannerPage : Page, IRefreshablePage
         }
     }
 
+    private async void ConvertBlockToTime_Click(object sender, RoutedEventArgs e)
+    {
+        var block = ViewModel.SelectedBlock;
+        if (block is null) return;
+
+        var commentBox = new TextBox
+        {
+            Header = "Task comment",
+            PlaceholderText = "What was done during this block? Leave empty to only create tracked time.",
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 110,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+
+        var content = new StackPanel
+        {
+            Spacing = 12,
+            MinWidth = 440,
+            Children =
+            {
+                new TextBlock
+                {
+                    Text = $"{block.Title}\n{block.Start:dddd, dd/MM/yyyy HH:mm} - {block.End:HH:mm}",
+                    TextWrapping = TextWrapping.Wrap
+                },
+                commentBox
+            }
+        };
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Create completed time?",
+            Content = content,
+            PrimaryButtonText = "Create",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await ViewModel.ConvertSelectedBlockToCompletedTimeAsync(commentBox.Text);
+            ScheduleBindingsUpdate();
+            ScheduleRenderCalendar();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Could not create completed time",
+                Content = ex.Message,
+                CloseButtonText = "OK"
+            }.ShowAsync();
+        }
+    }
+
     private void AssignmentTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key != Windows.System.VirtualKey.Enter || sender is not TextBox textBox) return;

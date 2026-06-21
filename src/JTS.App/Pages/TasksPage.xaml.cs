@@ -285,6 +285,101 @@ public sealed partial class TasksPage : Page, IRefreshablePage
             await ViewModel.DeleteRecurrenceAsync();
     }
 
+    private async void AddTimeEntry_Click(object sender, RoutedEventArgs e)
+    {
+        var now = DateTime.Now;
+        var defaultStart = new DateTime(now.Year, now.Month, now.Day, Math.Max(0, now.Hour - 1), 0, 0);
+        var defaultEnd = defaultStart.AddHours(1);
+        var startDatePicker = new CalendarDatePicker
+        {
+            Header = "Start date",
+            Date = new DateTimeOffset(defaultStart.Date),
+            FirstDayOfWeek = Windows.Globalization.DayOfWeek.Monday,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var startPicker = new TimePicker
+        {
+            Header = "Start time",
+            Time = defaultStart.TimeOfDay
+        };
+        var endDatePicker = new CalendarDatePicker
+        {
+            Header = "End date",
+            Date = new DateTimeOffset(defaultEnd.Date),
+            FirstDayOfWeek = Windows.Globalization.DayOfWeek.Monday,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var endPicker = new TimePicker
+        {
+            Header = "End time",
+            Time = defaultEnd.TimeOfDay
+        };
+        var noteBox = new TextBox
+        {
+            Header = "Note",
+            PlaceholderText = "Meeting, client visit, internal support...",
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            MinHeight = 84
+        };
+
+        var form = new Grid
+        {
+            ColumnSpacing = 12,
+            RowSpacing = 12,
+            MinWidth = 420
+        };
+        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        form.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        form.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        form.Children.Add(startDatePicker);
+        Grid.SetColumn(startPicker, 1);
+        form.Children.Add(startPicker);
+        Grid.SetRow(endDatePicker, 1);
+        form.Children.Add(endDatePicker);
+        Grid.SetRow(endPicker, 1);
+        Grid.SetColumn(endPicker, 1);
+        form.Children.Add(endPicker);
+        Grid.SetRow(noteBox, 2);
+        Grid.SetColumnSpan(noteBox, 2);
+        form.Children.Add(noteBox);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "Add completed time",
+            Content = form,
+            PrimaryButtonText = "Save",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary ||
+            startDatePicker.Date is not DateTimeOffset startDate ||
+            endDatePicker.Date is not DateTimeOffset endDate)
+            return;
+
+        var startedAtSpain = startDate.Date.Add(startPicker.Time);
+        var endedAtSpain = endDate.Date.Add(endPicker.Time);
+        if (endedAtSpain <= startedAtSpain)
+        {
+            await ShowMessageAsync("Invalid time range", "End date and time must be after the start.");
+            return;
+        }
+
+        try
+        {
+            await ViewModel.AddTimeEntryAsync(startedAtSpain, endedAtSpain, noteBox.Text);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowMessageAsync("Could not add tracked time", ex.Message);
+        }
+    }
+
     private async void EditTimeEntry_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not TaskTimeByDayView entry) return;

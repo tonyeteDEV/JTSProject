@@ -266,6 +266,22 @@ public partial class TasksViewModel : ObservableObject
         await _data.AddCommentAsync(taskDataverseId, task.Title, content);
     }
 
+    public async Task AddTimeEntryAsync(DateTime startedAtSpain, DateTime endedAtSpain, string? note)
+    {
+        if (SelectedTask is null || !_tasksById.TryGetValue(SelectedTask.Id, out var task) ||
+            task.DataverseId is not Guid taskDataverseId) return;
+        if (endedAtSpain <= startedAtSpain)
+            throw new InvalidOperationException("End date and time must be after the start.");
+
+        await _data.AddTimeEntryAsync(
+            taskDataverseId,
+            task.Title,
+            DisplayFormat.SpainTimeToUtc(startedAtSpain),
+            DisplayFormat.SpainTimeToUtc(endedAtSpain),
+            string.IsNullOrWhiteSpace(note) ? "Manual time entry from task detail" : note.Trim());
+        await LoadSelectedTaskDetailsAsync();
+    }
+
     public async Task UpdateTimeEntryAsync(Guid timeEntryId, DateTime startedAtSpain, int actualMinutes)
     {
         await _data.UpdateTimeEntryAsync(timeEntryId, DisplayFormat.SpainTimeToUtc(startedAtSpain), actualMinutes);

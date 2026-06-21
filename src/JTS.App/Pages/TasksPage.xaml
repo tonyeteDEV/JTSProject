@@ -389,12 +389,19 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Time by day" />
                     <TextBlock
                         Grid.Column="1"
                         Style="{StaticResource MutedTextBlockStyle}"
                         Text="{x:Bind ViewModel.SelectedTaskTimeTotalText, Mode=OneWay}" />
+                    <Button Grid.Column="2" Click="AddTimeEntry_Click" ToolTipService.ToolTip="Add completed time manually">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontSize="13" Glyph="&#xE710;" />
+                            <TextBlock Text="Add time" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
                 <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.SelectedTaskTimeByDay, Mode=OneWay}">
                     <ListView.ItemTemplate>

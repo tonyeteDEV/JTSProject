@@ -35,6 +35,7 @@ public sealed partial class WeeklyPlannerViewModel : ObservableObject
     {
         if (value is null || SelectedBlock?.TaskId != value.Id)
             SelectedBlock = null;
+        OnPropertyChanged(nameof(CanConvertSelectedBlock));
         RefreshSelectedTaskBlocks();
     }
 
@@ -42,8 +43,14 @@ public sealed partial class WeeklyPlannerViewModel : ObservableObject
     {
         if (value is not null && _taskById.TryGetValue(value.TaskId, out var task) && SelectedTask?.Id != task.Id)
             SelectedTask = task;
+        OnPropertyChanged(nameof(CanConvertSelectedBlock));
         RefreshSelectedTaskBlocks();
     }
+
+    public bool CanConvertSelectedBlock =>
+        SelectedBlock is { IsEditable: true } block &&
+        _taskModelsById.TryGetValue(block.TaskId, out var taskModel) &&
+        taskModel.DataverseId is not null;
 
     public WeeklyPlannerViewModel(DataverseAppDataService data, PomodoroService pomodoro)
     {
@@ -290,6 +297,40 @@ public sealed partial class WeeklyPlannerViewModel : ObservableObject
         await LoadAsync(forceSync: true);
     }
 
+    public async Task ConvertSelectedBlockToCompletedTimeAsync(string? comment)
+    {
+        if (SelectedBlock is not { IsEditable: true } block)
+            throw new InvalidOperationException("Select an editable planner block first.");
+        if (!_taskModelsById.TryGetValue(block.TaskId, out var taskModel) || taskModel.DataverseId is not Guid taskDataverseId)
+            throw new InvalidOperationException("The selected task is not linked to Dataverse.");
+        if (block.End <= block.Start)
+            throw new InvalidOperationException("The selected planner block has an invalid time range.");
+
+        var rangeText = $"{block.Start:dd/MM/yyyy HH:mm}-{block.End:HH:mm}";
+        var cleanComment = comment?.Trim();
+        var timeNote = string.IsNullOrWhiteSpace(cleanComment)
+            ? $"Converted from planner block {rangeText}"
+            : $"Converted from planner block {rangeText}. {cleanComment}";
+
+        await _data.AddTimeEntryAsync(
+            taskDataverseId,
+            taskModel.Title,
+            DisplayFormat.SpainTimeToUtc(block.Start),
+            DisplayFormat.SpainTimeToUtc(block.End),
+            timeNote);
+
+        if (!string.IsNullOrWhiteSpace(cleanComment))
+            await _data.AddCommentAsync(taskDataverseId, taskModel.Title, $"[{rangeText}] {cleanComment}", "Planner");
+
+        var addedSeconds = Math.Max(0, (int)Math.Round((block.End - block.Start).TotalSeconds));
+        if (_taskById.TryGetValue(block.TaskId, out var task))
+            task.AddSavedFocusSeconds(addedSeconds);
+
+        Status = string.IsNullOrWhiteSpace(cleanComment)
+            ? "Completed time created from the selected planner block."
+            : "Completed time and task comment created from the selected planner block.";
+    }
+
     public void PreviousWeek() => WeekStart = WeekStart.AddDays(-7);
     public void NextWeek() => WeekStart = WeekStart.AddDays(7);
     public void CurrentWeek() => WeekStart = StartOfWeek(DateTime.Today);
@@ -492,6 +533,12 @@ public sealed partial class PlannerTaskView : ObservableObject
     public void SetSavedFocusSeconds(int seconds)
     {
         SavedFocusSeconds = Math.Max(0, seconds);
+        ActualFocusSeconds = SavedFocusSeconds;
+    }
+
+    public void AddSavedFocusSeconds(int seconds)
+    {
+        SavedFocusSeconds = Math.Max(0, SavedFocusSeconds + seconds);
         ActualFocusSeconds = SavedFocusSeconds;
     }
 

@@ -172,8 +172,19 @@
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Scheduled blocks" />
+                        <Button
+                            Grid.Column="1"
+                            Click="ConvertBlockToTime_Click"
+                            IsEnabled="{x:Bind ViewModel.CanConvertSelectedBlock, Mode=OneWay}"
+                            ToolTipService.ToolTip="Create completed time from the selected planner block">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontSize="13" Glyph="&#xE73E;" />
+                                <TextBlock Text="Mark as done time" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
                     <ListView
                         x:Name="BlockDetailsList"
