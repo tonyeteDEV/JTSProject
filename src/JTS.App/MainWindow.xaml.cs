@@ -129,6 +129,7 @@ public sealed partial class MainWindow : Window
             case "tasks":     NavFrame.Navigate(typeof(TasksPage));     break;
             case "planner":   NavFrame.Navigate(typeof(WeeklyPlannerPage)); break;
             case "focus":     NavFrame.Navigate(typeof(FocusPage));     break;
+            case "streak":    NavFrame.Navigate(typeof(StreakPage));    break;
             case "customers": NavFrame.Navigate(typeof(CustomersPage)); break;
             case "projects":  NavFrame.Navigate(typeof(ProjectsPage));  break;
             default: throw new InvalidOperationException($"Unknown navigation item tag: {item.Tag}");

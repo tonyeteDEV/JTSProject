@@ -48,6 +48,8 @@
             <converters:RecordingButtonBackgroundConverter x:Key="RecordingButtonBackgroundConverter" />
             <converters:RecordingButtonForegroundConverter x:Key="RecordingButtonForegroundConverter" />
             <converters:ProjectColorBrushConverter x:Key="ProjectColorBrushConverter" />
+            <converters:StreakStatusToBrushConverter x:Key="StreakStatusToBrushConverter" />
+            <converters:BoolToSelectionBrushConverter x:Key="BoolToSelectionBrushConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

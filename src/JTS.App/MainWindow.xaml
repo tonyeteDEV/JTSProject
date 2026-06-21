@@ -92,6 +92,11 @@
                         <FontIcon Glyph="&#xE916;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem Content="Streak" Tag="streak">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7C1;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Customers" Tag="customers">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE716;" />

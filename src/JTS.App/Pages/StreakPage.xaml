@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="JTS_App.Pages.StreakPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:JTS_App.ViewModels"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <DataTemplate x:Key="DayCellTemplate" x:DataType="vm:StreakDay">
+            <Border
+                Width="24"
+                Height="22"
+                Margin="1.25"
+                Background="{x:Bind ColorHex, Converter={StaticResource ProjectColorBrushConverter}}"
+                BorderBrush="{x:Bind BorderHex, Mode=OneWay, Converter={StaticResource ProjectColorBrushConverter}}"
+                BorderThickness="1.5"
+                CornerRadius="4"
+                Tapped="DayCell_Tapped"
+                ToolTipService.ToolTip="{x:Bind Tooltip}">
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    FontSize="9.5"
+                    Foreground="#F4F7FB"
+                    Opacity="0.92"
+                    Text="{x:Bind DayText}" />
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="MonthTemplate" x:DataType="vm:StreakMonth">
+            <Border
+                Width="226"
+                Padding="10"
+                Background="#1E232A"
+                BorderBrush="#343B46"
+                BorderThickness="1"
+                CornerRadius="7">
+                <Grid RowSpacing="6">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        Foreground="#F4F7FB"
+                        Text="{x:Bind Name}" />
+                    <Grid Grid.Row="1" ColumnSpacing="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="L" />
+                        <TextBlock Grid.Column="1" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="M" />
+                        <TextBlock Grid.Column="2" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="X" />
+                        <TextBlock Grid.Column="3" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="J" />
+                        <TextBlock Grid.Column="4" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="V" />
+                        <TextBlock Grid.Column="5" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="S" />
+                        <TextBlock Grid.Column="6" FontSize="10" Foreground="#7F8A99" HorizontalTextAlignment="Center" Text="D" />
+                    </Grid>
+                    <GridView
+                        Grid.Row="2"
+                        HorizontalAlignment="Center"
+                        IsItemClickEnabled="False"
+                        ItemTemplate="{StaticResource DayCellTemplate}"
+                        ItemsSource="{x:Bind Cells}"
+                        SelectionMode="None">
+                        <GridView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <ItemsWrapGrid MaximumRowsOrColumns="7" Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </GridView.ItemsPanel>
+                        <GridView.ItemContainerStyle>
+                            <Style TargetType="GridViewItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="MinWidth" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </GridView.ItemContainerStyle>
+                    </GridView>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="MonthRowTemplate" x:DataType="vm:StreakMonthRow">
+            <ItemsControl
+                HorizontalAlignment="Center"
+                ItemTemplate="{StaticResource MonthTemplate}"
+                ItemsSource="{x:Bind Months}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="12" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid
+        Padding="24,20,24,24"
+        Background="#181B20"
+        RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="4">
+                <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="Streak" />
+                <TextBlock
+                    Style="{StaticResource MutedTextBlockStyle}"
+                    Text="Year view by month. The greener the day, the closer it is to the daily focus goal." />
+            </StackPanel>
+            <StackPanel
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="8">
+                <Button
+                    Width="36"
+                    Click="PrevYear_Click"
+                    ToolTipService.ToolTip="Previous year">
+                    <FontIcon FontSize="13" Glyph="&#xE76B;" />
+                </Button>
+                <TextBlock
+                    MinWidth="56"
+                    HorizontalTextAlignment="Center"
+                    Style="{StaticResource SubtitleTextBlockStyle}"
+                    Text="{x:Bind ViewModel.YearText, Mode=OneWay}"
+                    VerticalAlignment="Center" />
+                <Button
+                    Width="36"
+                    Click="NextYear_Click"
+                    IsEnabled="{x:Bind ViewModel.CanGoNext, Mode=OneWay}"
+                    ToolTipService.ToolTip="Next year">
+                    <FontIcon FontSize="13" Glyph="&#xE76C;" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource MetricCardBorderStyle}">
+                <StackPanel Spacing="6">
+                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Days goal met" />
+                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.DaysMetText, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource MetricCardBorderStyle}">
+                <StackPanel Spacing="6">
+                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Partial days" />
+                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.DaysPartialText, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+            <Border
+                Grid.Column="2"
+                Style="{StaticResource MetricCardBorderStyle}"
+                Visibility="{x:Bind ViewModel.ShowCurrentStreak, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel Spacing="6">
+                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Current streak" />
+                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.CurrentStreakText, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Style="{StaticResource MetricCardBorderStyle}">
+                <StackPanel Spacing="6">
+                    <TextBlock Style="{StaticResource MutedTextBlockStyle}" Text="Best streak" />
+                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.BestStreakText, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="2" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.55*" />
+                <ColumnDefinition Width="0.8*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Style="{StaticResource PanelBorderStyle}">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <ScrollViewer
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto">
+                        <ItemsControl
+                            HorizontalAlignment="Stretch"
+                            ItemTemplate="{StaticResource MonthRowTemplate}"
+                            ItemsSource="{x:Bind ViewModel.MonthRows, Mode=OneWay}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="12" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <StackPanel
+                        Grid.Row="1"
+                        VerticalAlignment="Bottom"
+                        Orientation="Horizontal"
+                        Spacing="10">
+                        <TextBlock VerticalAlignment="Center" Foreground="#AAB4C2" FontSize="12" Text="{x:Bind ViewModel.GoalText, Mode=OneWay}" />
+                        <Rectangle Width="16" />
+                        <Border Width="26" Height="13" CornerRadius="3" Background="#262C34" />
+                        <TextBlock VerticalAlignment="Center" Foreground="#7F8A99" FontSize="12" Text="0%" />
+                        <Border Width="26" Height="13" CornerRadius="3" Background="#D6A821" />
+                        <TextBlock VerticalAlignment="Center" Foreground="#7F8A99" FontSize="12" Text="50%" />
+                        <Border Width="26" Height="13" CornerRadius="3" Background="#2EA043" />
+                        <TextBlock VerticalAlignment="Center" Foreground="#7F8A99" FontSize="12" Text="Goal" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource PanelBorderStyle}">
+                <Grid>
+                    <StackPanel
+                        VerticalAlignment="Center"
+                        Spacing="8"
+                        Visibility="{x:Bind ViewModel.NoSelection, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <FontIcon
+                            HorizontalAlignment="Center"
+                            FontSize="28"
+                            Foreground="#4A5260"
+                            Glyph="&#xE787;" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Foreground="#7F8A99"
+                            Text="Select a day to see what you did."
+                            TextAlignment="Center"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <ScrollViewer Visibility="{x:Bind ViewModel.HasSelection, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind ViewModel.SelectedDateText, Mode=OneWay}" />
+                                <TextBlock Foreground="#AAB4C2" Text="{x:Bind ViewModel.SelectedTotalText, Mode=OneWay}" />
+                            </StackPanel>
+
+                            <StackPanel
+                                Spacing="6"
+                                Visibility="{x:Bind ViewModel.SelectedHasTasks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Foreground="#7F8A99" FontSize="12" Text="TIME BY TASK" />
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedTasks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:StreakTaskTime">
+                                            <Grid Margin="0,3,0,3" ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Foreground="#F4F7FB" Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Foreground="#7F8A99" FontSize="11" Text="{x:Bind Project}" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock
+                                                    Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Foreground="#AAB4C2"
+                                                    Text="{x:Bind Time}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+
+                            <StackPanel
+                                Spacing="6"
+                                Visibility="{x:Bind ViewModel.SelectedHasComments, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Foreground="#7F8A99" FontSize="12" Text="COMMENTS" />
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.SelectedComments}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Border
+                                                Margin="0,3,0,3"
+                                                Padding="10,8"
+                                                Background="#22262D"
+                                                CornerRadius="6">
+                                                <TextBlock
+                                                    Foreground="#D7DEE8"
+                                                    Text="{x:Bind}"
+                                                    TextWrapping="Wrap" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

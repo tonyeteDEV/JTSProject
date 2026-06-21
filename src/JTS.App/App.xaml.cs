@@ -162,6 +162,7 @@ public partial class App : Application
         services.AddTransient<TasksViewModel>();
         services.AddTransient<WeeklyPlannerViewModel>();
         services.AddSingleton<FocusViewModel>();
+        services.AddTransient<StreakViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddSingleton<AssistantViewModel>();
 
