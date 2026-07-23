@@ -66,6 +66,25 @@ public sealed partial class TasksPage : Page, IRefreshablePage
         }
     }
 
+    private async void CompleteTask_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedTask is not { } row || !ViewModel.CanCompleteSelectedTask) return;
+        try
+        {
+            await ViewModel.SetStatusAsync(row.Id, TaskItemStatus.Done);
+            await ViewModel.LoadAsync(forceSync: true);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await ShowMessageAsync("Task locked", ex.Message);
+        }
+    }
+
+    private void ToggleCompleted_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ShowCompletedTasks = !ViewModel.ShowCompletedTasks;
+    }
+
     // Legacy Backlog/Todo tasks are shown under the Assigned column, so reflect that
     // in the "Move to" box selection.
     private static TaskItemStatus DisplayStatus(TaskItemStatus status) => status switch

@@ -108,11 +108,21 @@
                 <Button Click="DeleteTask_Click" IsEnabled="{x:Bind ViewModel.CanDeleteSelectedTask, Mode=OneWay}">
                     <FontIcon FontSize="14" Glyph="&#xE74D;" />
                 </Button>
+                <Button Click="CompleteTask_Click" IsEnabled="{x:Bind ViewModel.CanCompleteSelectedTask, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE73E;" />
+                        <TextBlock Text="Complete" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </Border>
 
         <!-- Kanban board — 6 equal columns -->
         <Grid x:Name="KanbanBoard" Grid.Row="2" ColumnSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="*" />
@@ -319,12 +329,22 @@
                         ItemContainerStyle="{StaticResource KanbanItemStyle}"
                         ItemTemplate="{StaticResource KanbanCardTemplate}"
                         ItemsSource="{x:Bind ViewModel.ProductionTasks, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.ShowCompletedTasks, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
                         SelectionMode="None"
                         DragItemsStarting="KanbanList_DragItemsStarting"
                         DragOver="KanbanList_DragOver"
                         Drop="KanbanList_Drop" />
                 </Grid>
             </Border>
+
+            <Button
+                Grid.Row="1"
+                Grid.Column="5"
+                Margin="0,10,0,0"
+                HorizontalAlignment="Stretch"
+                Click="ToggleCompleted_Click">
+                <TextBlock HorizontalAlignment="Center" Text="{x:Bind ViewModel.CompletedToggleText, Mode=OneWay}" />
+            </Button>
         </Grid>
 
         <!-- Detail panel -->

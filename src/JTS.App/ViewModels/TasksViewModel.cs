@@ -38,6 +38,7 @@ public partial class TasksViewModel : ObservableObject
     [ObservableProperty] private string _selectedTaskChecklistProgress = "0/0";
     [ObservableProperty] private string _selectedTaskTimeTotalText = "Total tracked: 0m";
     [ObservableProperty] private bool _selectedTaskHasTimesheetLinks;
+    [ObservableProperty] private bool _showCompletedTasks;
     [ObservableProperty] private int _assignedCount;
     [ObservableProperty] private int _ongoingCount;
     [ObservableProperty] private int _testingCount;
@@ -49,14 +50,19 @@ public partial class TasksViewModel : ObservableObject
     {
         SelectedTaskHasTimesheetLinks = false;
         NotifySelectedTaskActionsChanged();
+        OnPropertyChanged(nameof(CanCompleteSelectedTask));
         _ = LoadSelectedTaskDetailsAsync();
     }
 
     partial void OnSelectedTaskHasTimesheetLinksChanged(bool value) => NotifySelectedTaskActionsChanged();
+    partial void OnShowCompletedTasksChanged(bool value) => OnPropertyChanged(nameof(CompletedToggleText));
+    partial void OnProductionCountChanged(int value) => OnPropertyChanged(nameof(CompletedToggleText));
 
     public bool CanEditSelectedTask => SelectedTask is not null;
     public bool CanDeleteSelectedTask => SelectedTask is not null && !SelectedTaskHasTimesheetLinks;
     public bool CanChangeSelectedTaskStatus => SelectedTask is not null;
+    public bool CanCompleteSelectedTask => SelectedTask is not null && SelectedTask.StatusEnum != TaskItemStatus.Done;
+    public string CompletedToggleText => ShowCompletedTasks ? "Hide completed" : $"Show completed ({ProductionCount})";
     public string SelectedTaskLockMessage => SelectedTaskHasTimesheetLinks
         ? "This task has time entries or comments already exported to a timesheet. Those records can't be edited or deleted, but you can still move the task and edit its details freely."
         : string.Empty;
@@ -77,6 +83,7 @@ public partial class TasksViewModel : ObservableObject
 
     public async Task LoadAsync(bool forceSync = false)
     {
+        var selectedTaskId = SelectedTask?.Id;
         var snapshot = await _data.LoadTaskSnapshotAsync(forceSync);
         AllProjects.Clear();
         foreach (var project in snapshot.Projects.OrderBy(p => p.Name))
@@ -135,8 +142,9 @@ public partial class TasksViewModel : ObservableObject
         UatCount = UatTasks.Count;
         ProductionCount = ProductionTasks.Count;
 
-        if (SelectedTask is not null && !_tasksById.ContainsKey(SelectedTask.Id))
-            SelectedTask = null;
+        SelectedTask = selectedTaskId is int id
+            ? Tasks.FirstOrDefault(task => task.Id == id)
+            : null;
     }
 
     public async Task LoadJournalAsync()
@@ -552,6 +560,7 @@ public partial class TasksViewModel : ObservableObject
         OnPropertyChanged(nameof(CanEditSelectedTask));
         OnPropertyChanged(nameof(CanDeleteSelectedTask));
         OnPropertyChanged(nameof(CanChangeSelectedTaskStatus));
+        OnPropertyChanged(nameof(CanCompleteSelectedTask));
         OnPropertyChanged(nameof(SelectedTaskLockMessage));
     }
 }
